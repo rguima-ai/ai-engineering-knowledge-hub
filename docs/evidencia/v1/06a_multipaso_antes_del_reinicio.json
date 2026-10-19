@@ -1,0 +1,208 @@
+{
+  "conversation_id": "61bf5971-59df-4a4b-9e11-369be56a6046",
+  "job_id": "14271cab-71f9-4448-922b-78cb6eec9216",
+  "kind": "chat",
+  "user_id": "ana",
+  "payload": {
+    "question": "Revisá mi agente de LangGraph, comparalo con lo explicado en el módulo 5, indicame qué está mal, explicame las correcciones como principiante y después generame cinco preguntas para comprobar si entendí.",
+    "code": "\"\"\"Agente ReAct de un alumno, con errores a propósito, para la demo multipaso.\n\nErrores sembrados (el sistema tiene que encontrarlos comparando con el módulo 5):\n1. El estado redefine `messages` sin reducer: cada nodo pisa el historial.\n2. `model.invoke` sincrónico dentro de `async def`: bloquea el event loop.\n3. El modelo nunca recibe las herramientas (`bind_tools`).\n4. Falta la arista tools -> agent: el ciclo ReAct termina después de la primera herramienta.\n5. Se compila sin checkpointer y se invoca sin `thread_id`: no hay memoria entre turnos.\n\"\"\"\n\nfrom typing import TypedDict\n\nfrom langchain_core.messages import BaseMessage\nfrom langchain_core.tools import tool\nfrom langchain_openai import ChatOpenAI\nfrom langgraph.graph import END, START, StateGraph\nfrom langgraph.prebuilt import ToolNode, tools_condition\n\n\nclass AgentState(TypedDict):\n    messages: list[BaseMessage]\n\n\n@tool\ndef search_knowledge_base(query: str) -> str:\n    \"\"\"Busca en la base de conocimiento interna.\"\"\"\n    return f\"Resultado para {query}\"\n\n\nTOOLS = [search_knowledge_base]\nmodel = ChatOpenAI(model=\"gpt-4.1-mini\")\n\n\nasync def call_model(state: AgentState) -> dict:\n    response = model.invoke(state[\"messages\"])\n    return {\"messages\": [response]}\n\n\nworkflow = StateGraph(AgentState)\nworkflow.add_node(\"agent\", call_model)\nworkflow.add_node(\"tools\", ToolNode(TOOLS))\nworkflow.add_edge(START, \"agent\")\nworkflow.add_conditional_edges(\"agent\", tools_condition, {\"tools\": \"tools\", END: END})\nworkflow.add_edge(\"tools\", END)\n\ngraph = workflow.compile()\n\n\nasync def main() -> None:\n    result = await graph.ainvoke({\"messages\": [(\"user\", \"¿Cuál es la política de reembolsos?\")]})\n    print(result[\"messages\"][-1].content)\n",
+    "level": "principiante",
+    "modules": null
+  },
+  "status": "DONE",
+  "result": {
+    "answer": "Hola! Revisé tu agente de LangGraph y te cuento qué está mal y cómo corregirlo, explicado para que sea fácil de entender:\n\n1. **Estado que guarda mensajes:** En tu código, el estado redefine `messages` como una lista simple y no usa el \"reducer\" `add_messages`. Esto hace que cada vez que un nodo agrega un mensaje, sobrescribe el historial anterior en vez de acumularlo. La solución es que tu estado herede de `MessagesState`, que ya tiene incorporado ese acumulador automático de mensajes. Así, cada mensaje nuevo se suma al historial y el agente recuerda todo lo que pasó antes [1][2][3].\n\n2. **Llamada al modelo asíncrona:** La función que llama al modelo es asíncrona (`async`), pero dentro usas una llamada sincrónica (`model.invoke`). Esto bloquea el programa y no aprovecha la concurrencia. Debés usar la versión asíncrona `await model.ainvoke(...)` para que el programa siga funcionando mientras espera la respuesta del modelo [3][7].\n\n3. **Vinculación de herramientas:** El modelo `ChatOpenAI` debe estar vinculado a las herramientas con `bind_tools`. Si no, el modelo no puede llamar a las herramientas y el agente no funciona bien. La corrección es usar `model_with_tools = model.bind_tools(TOOLS, parallel_tool_calls=False)` para que el modelo pueda usar las herramientas correctamente [3][7].\n\n4. **Ciclo del grafo incompleto:** Falta la conexión que vuelve del nodo de herramientas al nodo agente. Sin esa arista, el flujo termina después de la primera llamada a herramienta y no puede hacer varios pasos. Hay que agregar `workflow.add_edge(\"tools\", \"agent\")` para que el agente pueda seguir tomando decisiones después de cada herramienta [1][3][7].\n\n5. **Persistencia y memoria:** El grafo se compila sin un \"checkpointer\" y la invocación no usa `thread_id`. Esto significa que no se guarda la conversación ni se recuerda entre turnos. La solución es usar un checkpointer asíncrono como `AsyncSqliteSaver` al compilar el grafo y llamar al grafo con `ainvoke` pasando un `thread_id` para mantener la memoria [3][7].\n\n6. **Manejo de errores en herramientas:** El nodo de herramientas debe crearse con `handle_tool_errors=True` para que los errores no rompan el flujo, sino que se conviertan en observaciones que el agente pueda entender y manejar. Esto evita que el programa se caiga si una herramienta falla [3][7].\n\n7. **Manejo de errores de infraestructura:** Aunque no es un error grave, es recomendable que las herramientas manejen errores como `TimeoutError` o `ConnectionError` para que el agente pueda responder con mensajes controlados y no se caiga el proceso [3][7].\n\n**Aspectos positivos:** Definiste una herramienta propia con `@tool`, usaste `StateGraph` para el flujo, implementaste la arista condicional `tools_condition`, y tu código es claro y lógico.\n\n---\n\n### Preguntas para comprobar tu comprensión:\n\n1. ¿Por qué es importante que el estado herede de `MessagesState` en LangGraph?\n   - Respuesta: Porque `MessagesState` incluye un acumulador que guarda todo el historial de mensajes, evitando que se sobrescriban.\n\n2. ¿Qué problema causa usar `model.invoke` en una función asíncrona y cómo se corrige?\n   - Respuesta: Bloquea el event loop y se corrige usando `await model.ainvoke(...)` para que sea no bloqueante.\n\n3. ¿Para qué sirve `bind_tools` en el modelo?\n   - Respuesta: Para vincular las herramientas al modelo y que pueda hacer llamadas a ellas.\n\n4. ¿Qué pasa si no agregás la arista que conecta `tools` de vuelta a `agent`?\n   - Respuesta: El flujo termina después de la primera llamada a herramienta y no puede hacer múltiples pasos.\n\n5. ¿Cómo se logra que el agente recuerde la conversación entre turnos?\n   - Respuesta: Usando un checkpointer asíncrono como `AsyncSqliteSaver` y pasando un `thread_id` en la invocación.\n\nEspero que te sirva esta revisión y las preguntas para afianzar lo aprendido!",
+    "citations": [
+      {
+        "number": 1,
+        "chunk_id": "5ac1687ddad60a96::1",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "## Arquitectura\n\n```mermaid\nflowchart LR\n START((START)) --> AGENT[agent / LLM]\n AGENT -->|hay tool_calls| TOOLS[ToolNode]\n TOOLS -->|observación| AGENT\n AGENT -->|sin tool_calls| END((END))\n```\n\nEl estado hereda de `MessagesState`. Esa clase ya contiene:\n\n```python\nmessages: Ann"
+      },
+      {
+        "number": 2,
+        "chunk_id": "5ac1687ddad60a96::5",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "### 3. El estado acumulativo\n\n```python\nclass AgentState(MessagesState):\n pass\n```\n\n`MessagesState` ya incorpora el historial y el reducer `add_messages`. Por eso cada\nobservación de una herramienta queda disponible para la siguiente decisión del agente.\n\n### 4. La arista condici"
+      },
+      {
+        "number": 3,
+        "chunk_id": "24edbb1bfbf15a45::1",
+        "source": "sample_docs/modulo_05_langgraph/react_graph.py",
+        "title": "react_graph",
+        "module": 5,
+        "snippet": "class AgentState(MessagesState):\n \"\"\"Estado del grafo.\n\n MessagesState ya define `messages` con el reducer `add_messages`, por eso cada nodo\n agrega mensajes al historial en lugar de borrar los anteriores.\n \"\"\"\n\nSYSTEM_PROMPT = SystemMessage(\n content=(\n \"Sos un agente de soporte"
+      },
+      {
+        "number": 7,
+        "chunk_id": "5ac1687ddad60a96::0",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "# Pre-entrega 5 — Agente ReAct con memoria persistente\n\nProyecto en Python 3.12 que implementa un agente asíncrono con LangGraph. El agente decide\npor sí mismo cuándo consultar una herramienta, puede recorrer el ciclo\n`agente → herramienta → agente` varias veces y conserva la con"
+      }
+    ],
+    "quiz": [
+      {
+        "question": "¿Por qué es importante que el estado herede de `MessagesState` en LangGraph?",
+        "options": [
+          "Para que el estado pueda almacenar el historial acumulativo de mensajes",
+          "Para que el estado sea una lista simple",
+          "Para que el estado ignore los mensajes anteriores",
+          "Para que el estado solo guarde el último mensaje"
+        ],
+        "answer": "Para que el estado pueda almacenar el historial acumulativo de mensajes",
+        "explanation": "`MessagesState` incluye un reducer que acumula los mensajes en vez de sobrescribirlos, permitiendo que el agente recuerde todo el historial."
+      },
+      {
+        "question": "¿Qué problema causa usar `model.invoke` en una función asíncrona y cómo se corrige?",
+        "options": [
+          "No hay problema, es correcto",
+          "Bloquea el event loop; se corrige usando `await model.ainvoke(...)`",
+          "Hace que el modelo no responda",
+          "Hace que el modelo llame a herramientas incorrectamente"
+        ],
+        "answer": "Bloquea el event loop; se corrige usando `await model.ainvoke(...)`",
+        "explanation": "`model.invoke` es sincrónico y bloquea la ejecución; `ainvoke` es asíncrono y permite concurrencia."
+      },
+      {
+        "question": "¿Para qué sirve `bind_tools` en el modelo?",
+        "options": [
+          "Para vincular herramientas y permitir que el modelo las invoque",
+          "Para crear un nuevo modelo",
+          "Para eliminar herramientas",
+          "Para hacer que el modelo sea sincrónico"
+        ],
+        "answer": "Para vincular herramientas y permitir que el modelo las invoque",
+        "explanation": "`bind_tools` conecta las herramientas al modelo para que pueda decidir cuándo usarlas."
+      },
+      {
+        "question": "¿Qué pasa si no agregás la arista que conecta `tools` de vuelta a `agent`?",
+        "options": [
+          "El flujo termina después de la primera llamada a herramienta",
+          "El agente puede hacer múltiples pasos",
+          "El modelo no funciona",
+          "El grafo no se compila"
+        ],
+        "answer": "El flujo termina después de la primera llamada a herramienta",
+        "explanation": "Sin esa arista, el ciclo ReAct no puede continuar y el agente no puede hacer más decisiones."
+      },
+      {
+        "question": "¿Cómo se logra que el agente recuerde la conversación entre turnos?",
+        "options": [
+          "Usando un checkpointer asíncrono y pasando un `thread_id`",
+          "No se puede recordar",
+          "Guardando el estado en un archivo de texto",
+          "Usando solo variables globales"
+        ],
+        "answer": "Usando un checkpointer asíncrono y pasando un `thread_id`",
+        "explanation": "El checkpointer guarda el estado y el `thread_id` identifica la sesión para recuperar el historial."
+      }
+    ],
+    "code_review": {
+      "summary": "El código del alumno presenta varios errores importantes que afectan la funcionalidad del agente ReAct con LangGraph, principalmente relacionados con la gestión del estado, la asincronía, la vinculación de herramientas, el ciclo del grafo y la persistencia. Se detallan las correcciones necesarias para cada problema y se destacan aspectos positivos del código.",
+      "issues": [
+        {
+          "severity": "alta",
+          "line": 19,
+          "problem": "El estado redefine `messages` como una lista simple sin usar el reducer `add_messages`, lo que provoca que cada nodo sobrescriba el historial en lugar de acumularlo.",
+          "fix": "Heredar de `MessagesState` en lugar de `TypedDict` para que el estado incluya el historial acumulativo con el reducer `add_messages`.",
+          "sources": [
+            1,
+            2,
+            3
+          ]
+        },
+        {
+          "severity": "alta",
+          "line": 29,
+          "problem": "La función `call_model` es asíncrona pero llama a `model.invoke` de forma sincrónica, bloqueando el event loop y afectando el rendimiento.",
+          "fix": "Usar la versión asíncrona `await model.ainvoke(...)` para no bloquear el event loop y permitir concurrencia adecuada.",
+          "sources": [
+            3,
+            7
+          ]
+        },
+        {
+          "severity": "alta",
+          "line": 14,
+          "problem": "El modelo `ChatOpenAI` se instancia sin vincular las herramientas mediante `bind_tools`, por lo que el modelo no puede realizar llamadas a herramientas.",
+          "fix": "Usar `model_with_tools = model.bind_tools(TOOLS, parallel_tool_calls=False)` para que el modelo pueda invocar herramientas correctamente.",
+          "sources": [
+            3,
+            7
+          ]
+        },
+        {
+          "severity": "alta",
+          "line": 38,
+          "problem": "Falta la arista que conecta el nodo `tools` de vuelta al nodo `agent`, por lo que el ciclo ReAct termina después de la primera llamada a herramienta y no permite múltiples pasos.",
+          "fix": "Agregar la arista `workflow.add_edge(\"tools\", \"agent\")` para que el flujo regrese al agente después de ejecutar una herramienta.",
+          "sources": [
+            1,
+            3,
+            7
+          ]
+        },
+        {
+          "severity": "alta",
+          "line": 43,
+          "problem": "El grafo se compila sin un checkpointer y la invocación no usa `thread_id`, por lo que no hay persistencia ni memoria entre turnos de conversación.",
+          "fix": "Al compilar el grafo, pasar un checkpointer asíncrono como `AsyncSqliteSaver` y usar `ainvoke` con un `thread_id` para mantener la memoria entre turnos.",
+          "sources": [
+            3,
+            7
+          ]
+        },
+        {
+          "severity": "media",
+          "line": 38,
+          "problem": "El nodo `ToolNode` se crea sin `handle_tool_errors=True`, por lo que errores en las herramientas no se convierten en observaciones para el agente y pueden causar fallos.",
+          "fix": "Crear el nodo `ToolNode` con `handle_tool_errors=True` para manejar errores de herramientas y convertirlos en observaciones para el agente.",
+          "sources": [
+            3,
+            7
+          ]
+        },
+        {
+          "severity": "baja",
+          "line": null,
+          "problem": "El código no incluye manejo explícito de errores de infraestructura (timeout, conexión) en las herramientas, lo que es recomendable para resiliencia.",
+          "fix": "Agregar manejo de excepciones como `TimeoutError` y `ConnectionError` en las herramientas para devolver mensajes de error controlados.",
+          "sources": [
+            3,
+            7
+          ]
+        }
+      ],
+      "strengths": [
+        "Define una herramienta propia con `@tool` y docstring descriptivo.",
+        "Usa `StateGraph` para definir el flujo del agente y las herramientas.",
+        "Implementa una arista condicional con `tools_condition` para decidir el flujo entre agente y herramientas.",
+        "Usa tipado estático con `TypedDict` para definir el estado (aunque mal aplicado).",
+        "El código es claro y sigue una estructura lógica fácil de entender."
+      ]
+    },
+    "validation": {
+      "verdict": "approved",
+      "unsupported_claims": [],
+      "feedback": ""
+    },
+    "agents_used": [
+      "retriever",
+      "code_reviewer",
+      "tutor",
+      "validator"
+    ],
+    "revisions": 0
+  },
+  "error": null,
+  "approval_request": null,
+  "approval_decision": null,
+  "created_at": "2026-10-19T22:43:54.063064Z",
+  "updated_at": "2026-10-19T22:44:14.736371Z"
+}

@@ -1,0 +1,60 @@
+{
+  "conversation_id": "1cea5c8b-da23-4798-aadc-b77cf9c46715",
+  "job_id": "9bf5b329-3ef3-4536-bb1c-2694e0ac784e",
+  "kind": "chat",
+  "user_id": "ana",
+  "payload": {
+    "question": "Recordame en una línea cada uno de los errores que encontraste en mi agente al principio de esta conversación.",
+    "code": null,
+    "level": "intermedio",
+    "modules": null
+  },
+  "status": "DONE",
+  "result": {
+    "answer": "Aquí te resumo en una línea cada uno de los errores que encontré en tu agente al principio:\n\n1. El estado no acumula mensajes, por lo que se pierde el historial de la conversación.\n2. La llamada al modelo es sincrónica y bloquea el programa, en lugar de ser asíncrona.\n3. El modelo no está vinculado a las herramientas, por lo que no puede usarlas.\n4. Falta la arista que regresa el flujo desde la herramienta al agente para continuar el ciclo.\n\nEstos errores afectan la memoria, la eficiencia, la autonomía y el ciclo ReAct del agente, respectivamente [1][4][5].",
+    "citations": [
+      {
+        "number": 1,
+        "chunk_id": "5ac1687ddad60a96::7",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "No se guarda el razonamiento privado del modelo. La traza registra decisiones observables,\nargumentos, resultados y respuestas, que es lo necesario para auditar el flujo.\n\n## Checklist de la consigna\n\n- [x] Python 3.12+ y entorno virtual documentado.\n- [x] `StateGraph` con estado"
+      },
+      {
+        "number": 4,
+        "chunk_id": "5ac1687ddad60a96::1",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "## Arquitectura\n\n```mermaid\nflowchart LR\n START((START)) --> AGENT[agent / LLM]\n AGENT -->|hay tool_calls| TOOLS[ToolNode]\n TOOLS -->|observación| AGENT\n AGENT -->|sin tool_calls| END((END))\n```\n\nEl estado hereda de `MessagesState`. Esa clase ya contiene:\n\n```python\nmessages: Ann"
+      },
+      {
+        "number": 5,
+        "chunk_id": "24edbb1bfbf15a45::1",
+        "source": "sample_docs/modulo_05_langgraph/react_graph.py",
+        "title": "react_graph",
+        "module": 5,
+        "snippet": "class AgentState(MessagesState):\n \"\"\"Estado del grafo.\n\n MessagesState ya define `messages` con el reducer `add_messages`, por eso cada nodo\n agrega mensajes al historial en lugar de borrar los anteriores.\n \"\"\"\n\nSYSTEM_PROMPT = SystemMessage(\n content=(\n \"Sos un agente de soporte"
+      }
+    ],
+    "quiz": [],
+    "code_review": null,
+    "validation": {
+      "verdict": "approved",
+      "unsupported_claims": [],
+      "feedback": ""
+    },
+    "agents_used": [
+      "retriever",
+      "tutor",
+      "validator"
+    ],
+    "revisions": 0
+  },
+  "error": null,
+  "approval_request": null,
+  "approval_decision": null,
+  "created_at": "2026-10-19T22:43:17.743591Z",
+  "updated_at": "2026-10-19T22:43:28.652795Z"
+}

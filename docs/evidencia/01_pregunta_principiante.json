@@ -1,0 +1,68 @@
+{
+  "conversation_id": "ca88438e-47b3-458b-8914-73dc64830023",
+  "job_id": "18b5c1f5-c771-47cd-8914-80676ec92428",
+  "kind": "chat",
+  "user_id": "ana",
+  "payload": {
+    "question": "¿Qué es un checkpointer en LangGraph y para qué lo usamos en el curso?",
+    "code": null,
+    "level": "principiante",
+    "modules": null
+  },
+  "status": "DONE",
+  "result": {
+    "answer": "Un checkpointer en LangGraph es un componente que guarda el estado del agente después de cada paso del flujo de trabajo. En el curso, usamos un checkpointer basado en SQLite, específicamente `AsyncSqliteSaver`, que almacena una \"fotografía\" del estado en una base de datos SQLite. Esto permite que el agente recuerde el historial de la conversación usando un identificador llamado `thread_id`, lo que facilita la persistencia y recuperación del estado para continuar la interacción sin perder contexto.\n\nEn términos simples, el checkpointer es como una cámara que saca fotos del estado del agente en cada paso para que, si volvemos a la conversación, podamos ver qué pasó antes y seguir desde ahí. Esto es fundamental para que el agente pueda tener memoria y manejar conversaciones multi-turno de forma autónoma.\n\nAdemás, se usa la variante asíncrona `AsyncSqliteSaver` porque el proyecto utiliza llamadas asíncronas (`ainvoke`), y esta versión es adecuada para ese tipo de ejecución.\n\nEn resumen, el checkpointer nos ayuda a guardar y recuperar el historial de la conversación para que el agente pueda mantener memoria y funcionar correctamente en el curso.\n\nEsta explicación está basada en los fragmentos [1], [2], [3] y [6].",
+    "citations": [
+      {
+        "number": 1,
+        "chunk_id": "5ac1687ddad60a96::7",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "No se guarda el razonamiento privado del modelo. La traza registra decisiones observables,\nargumentos, resultados y respuestas, que es lo necesario para auditar el flujo.\n\n## Checklist de la consigna\n\n- [x] Python 3.12+ y entorno virtual documentado.\n- [x] `StateGraph` con estado"
+      },
+      {
+        "number": 2,
+        "chunk_id": "5ac1687ddad60a96::5",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "### 3. El estado acumulativo\n\n```python\nclass AgentState(MessagesState):\n pass\n```\n\n`MessagesState` ya incorpora el historial y el reducer `add_messages`. Por eso cada\nobservación de una herramienta queda disponible para la siguiente decisión del agente.\n\n### 4. La arista condici"
+      },
+      {
+        "number": 3,
+        "chunk_id": "24edbb1bfbf15a45::1",
+        "source": "sample_docs/modulo_05_langgraph/react_graph.py",
+        "title": "react_graph",
+        "module": 5,
+        "snippet": "class AgentState(MessagesState):\n \"\"\"Estado del grafo.\n\n MessagesState ya define `messages` con el reducer `add_messages`, por eso cada nodo\n agrega mensajes al historial en lugar de borrar los anteriores.\n \"\"\"\n\nSYSTEM_PROMPT = SystemMessage(\n content=(\n \"Sos un agente de soporte"
+      },
+      {
+        "number": 6,
+        "chunk_id": "5ac1687ddad60a96::0",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "# Pre-entrega 5 — Agente ReAct con memoria persistente\n\nProyecto en Python 3.12 que implementa un agente asíncrono con LangGraph. El agente decide\npor sí mismo cuándo consultar una herramienta, puede recorrer el ciclo\n`agente → herramienta → agente` varias veces y conserva la con"
+      }
+    ],
+    "quiz": [],
+    "code_review": null,
+    "validation": {
+      "verdict": "approved",
+      "unsupported_claims": [],
+      "feedback": ""
+    },
+    "agents_used": [
+      "retriever",
+      "tutor",
+      "validator"
+    ],
+    "revisions": 0
+  },
+  "error": null,
+  "approval_request": null,
+  "approval_decision": null,
+  "created_at": "2026-10-19T23:04:04.715097Z",
+  "updated_at": "2026-10-19T23:04:15.684969Z"
+}

@@ -1,0 +1,71 @@
+name: ai-engineering-knowledge-hub
+
+x-app: &app
+  build: .
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    REDIS_URL: redis://redis:6379
+    PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:6006/v1/traces
+
+services:
+  redis:
+    # Redis 8 trae RedisJSON y RediSearch, que necesita AsyncRedisSaver (checkpointer).
+    image: redis:8
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    environment:
+      PHOENIX_WORKING_DIR: /root/.phoenix
+    ports:
+      - "6006:6006"
+    volumes:
+      - phoenix-data:/root/.phoenix
+
+  # Ingesta inicial: corre una vez, es idempotente, y recién después arrancan api y worker.
+  seed:
+    <<: *app
+    command: ["python", "-m", "app.seed"]
+    volumes:
+      # Material privado del curso: se monta, no se copia a la imagen.
+      - ./knowledge_base:/app/knowledge_base:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "app.worker"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      phoenix:
+        condition: service_started
+      seed:
+        condition: service_completed_successfully
+
+volumes:
+  redis-data:
+  phoenix-data:

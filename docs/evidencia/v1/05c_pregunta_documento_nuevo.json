@@ -1,0 +1,53 @@
+{
+  "conversation_id": "adb34ab7-9d54-4bcc-bba7-99b5184be677",
+  "job_id": "276e788a-c3e7-40a3-a72e-d1df5249b030",
+  "kind": "chat",
+  "user_id": "ana",
+  "payload": {
+    "question": "¿Por qué el worker con BLPOP tiraba TimeoutError intermitentes y cómo se arregla?",
+    "code": null,
+    "level": "intermedio",
+    "modules": null
+  },
+  "status": "DONE",
+  "result": {
+    "answer": "El worker que usa `BLPOP` en Redis con redis-py 8 experimentaba `TimeoutError` intermitentes porque redis-py 8 tiene por defecto un `socket_timeout` de 5 segundos. Si el worker hace un `BLPOP` con un timeout de 5 segundos, el socket del cliente corta la conexión antes que Redis, lo que genera el error de timeout intermitente.\n\nLa solución para este problema es configurar el `socket_timeout` de la conexión Redis del worker para que sea mayor que el timeout del comando bloqueante `BLPOP`, o directamente ponerlo en `None` para que no haya timeout en el socket. Esto evita que el cliente cierre la conexión antes que Redis y así no se producen esos errores intermitentes.\n\nAdemás, este problema no se reproduce con `fakeredis` (una simulación de Redis para pruebas), sino que solo ocurre con un Redis real.\n\nEn resumen, para arreglar el problema del `TimeoutError` intermitente con `BLPOP` en redis-py 8, hay que ajustar el `socket_timeout` del cliente Redis del worker a un valor mayor que el timeout del `BLPOP` o a `None` para que no expire antes la conexión.\n\nEsto está explicado claramente en el fragmento [1].",
+    "citations": [
+      {
+        "number": 1,
+        "chunk_id": "4c9214afabdd23b3::0",
+        "source": "uploads/apunte_lecciones_produccion.md",
+        "title": "Lecciones aprendidas en producción (Pre-entrega 7)",
+        "module": 7,
+        "snippet": "# Lecciones aprendidas en producción (Pre-entrega 7)\n\nApunte propio con problemas reales que aparecieron al llevar el agente a Docker.\n\n## redis-py 8 y BLPOP\n\nredis-py 8 trae por defecto `socket_timeout=5`. Si el worker hace `BLPOP` con un timeout de\n5 segundos, el socket corta a"
+      },
+      {
+        "number": 2,
+        "chunk_id": "4dea69d4daa23dd0::10",
+        "source": "sample_docs/modulo_07_produccion/entrega7_api_produccion.md",
+        "title": "Pre-entrega 7 — API de producción y monitoreo activo",
+        "module": 7,
+        "snippet": "## Limitaciones conocidas\n\n- La cola basada en Redis List es apropiada para esta pre-entrega. Un sistema crítico debería usar\n Redis Streams, consumer groups o una cola como Celery/ARQ para acknowledgements y reentrega si\n un worker muere después de `BLPOP`.\n- Si el proceso worke"
+      }
+    ],
+    "quiz": [],
+    "code_review": null,
+    "validation": {
+      "verdict": "approved",
+      "unsupported_claims": [],
+      "feedback": ""
+    },
+    "agents_used": [
+      "retriever",
+      "retriever",
+      "tutor",
+      "validator"
+    ],
+    "revisions": 0
+  },
+  "error": null,
+  "approval_request": null,
+  "approval_decision": null,
+  "created_at": "2026-10-19T22:41:01.330733Z",
+  "updated_at": "2026-10-19T22:41:11.304348Z"
+}

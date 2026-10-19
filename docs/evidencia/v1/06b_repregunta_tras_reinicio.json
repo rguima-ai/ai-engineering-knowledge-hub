@@ -1,0 +1,84 @@
+{
+  "conversation_id": "61bf5971-59df-4a4b-9e11-369be56a6046",
+  "job_id": "9da4b8d7-30c0-4201-8c69-f2dc95e33d5d",
+  "kind": "chat",
+  "user_id": "ana",
+  "payload": {
+    "question": "Recordame en una línea cada uno de los errores que encontraste en mi agente al principio de esta conversación.",
+    "code": null,
+    "level": "intermedio",
+    "modules": null
+  },
+  "status": "DONE",
+  "result": {
+    "answer": "1. El estado redefine `messages` sin usar el acumulador `add_messages`, perdiendo el historial acumulativo.\n2. Se usa `model.invoke` en función asíncrona en vez de `await model.ainvoke`, bloqueando el event loop.\n3. El modelo no está vinculado a las herramientas con `bind_tools`, por lo que no puede llamarlas.\n4. Falta la arista que conecta el nodo de herramientas de vuelta al agente, impidiendo ciclos múltiples.\n5. No se usa un checkpointer ni `thread_id`, por lo que no se guarda ni recupera la memoria entre turnos.\n6. El nodo de herramientas no maneja errores con `handle_tool_errors=True`, lo que puede romper el flujo.\n7. No se manejan errores de infraestructura como `TimeoutError` o `ConnectionError` en las herramientas.\n",
+    "citations": [
+      {
+        "number": 1,
+        "chunk_id": "5ac1687ddad60a96::5",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "### 3. El estado acumulativo\n\n```python\nclass AgentState(MessagesState):\n pass\n```\n\n`MessagesState` ya incorpora el historial y el reducer `add_messages`. Por eso cada\nobservación de una herramienta queda disponible para la siguiente decisión del agente.\n\n### 4. La arista condici"
+      },
+      {
+        "number": 2,
+        "chunk_id": "24edbb1bfbf15a45::0",
+        "source": "sample_docs/modulo_05_langgraph/react_graph.py",
+        "title": "react_graph",
+        "module": 5,
+        "snippet": "# Archivo: react_graph.py\n\"\"\"Definición del estado, los nodos y las aristas del agente ReAct.\"\"\"\n\nfrom __future__ import annotations\n\nfrom collections.abc import Sequence\nfrom typing import Any, Protocol\n\nfrom langchain_core.messages import BaseMessage, SystemMessage\nfrom langgra"
+      },
+      {
+        "number": 3,
+        "chunk_id": "24edbb1bfbf15a45::1",
+        "source": "sample_docs/modulo_05_langgraph/react_graph.py",
+        "title": "react_graph",
+        "module": 5,
+        "snippet": "class AgentState(MessagesState):\n \"\"\"Estado del grafo.\n\n MessagesState ya define `messages` con el reducer `add_messages`, por eso cada nodo\n agrega mensajes al historial en lugar de borrar los anteriores.\n \"\"\"\n\nSYSTEM_PROMPT = SystemMessage(\n content=(\n \"Sos un agente de soporte"
+      },
+      {
+        "number": 4,
+        "chunk_id": "5ac1687ddad60a96::1",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "## Arquitectura\n\n```mermaid\nflowchart LR\n START((START)) --> AGENT[agent / LLM]\n AGENT -->|hay tool_calls| TOOLS[ToolNode]\n TOOLS -->|observación| AGENT\n AGENT -->|sin tool_calls| END((END))\n```\n\nEl estado hereda de `MessagesState`. Esa clase ya contiene:\n\n```python\nmessages: Ann"
+      },
+      {
+        "number": 5,
+        "chunk_id": "5ac1687ddad60a96::7",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "No se guarda el razonamiento privado del modelo. La traza registra decisiones observables,\nargumentos, resultados y respuestas, que es lo necesario para auditar el flujo.\n\n## Checklist de la consigna\n\n- [x] Python 3.12+ y entorno virtual documentado.\n- [x] `StateGraph` con estado"
+      },
+      {
+        "number": 7,
+        "chunk_id": "5ac1687ddad60a96::2",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "La aplicación no contiene un `if pregunta == ...`. El LLM toma las decisiones mediante Tool\nCalling y la arista condicional `tools_condition` interpreta esas decisiones.\n\n## Estructura\n\n```text\nlanggraph-react-agent/\n├── src/react_agent/\n│ ├── config.py # Variables de entorno val"
+      }
+    ],
+    "quiz": [],
+    "code_review": null,
+    "validation": {
+      "verdict": "approved",
+      "unsupported_claims": [],
+      "feedback": ""
+    },
+    "agents_used": [
+      "retriever",
+      "tutor",
+      "validator"
+    ],
+    "revisions": 0
+  },
+  "error": null,
+  "approval_request": null,
+  "approval_decision": null,
+  "created_at": "2026-10-19T22:44:19.215677Z",
+  "updated_at": "2026-10-19T22:44:27.854784Z"
+}

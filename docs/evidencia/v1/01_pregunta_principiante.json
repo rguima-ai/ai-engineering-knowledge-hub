@@ -1,0 +1,60 @@
+{
+  "conversation_id": "ef0b7cad-f3b4-49c7-baf9-41dd60bc7d84",
+  "job_id": "5669b9bf-dd82-4306-9c69-4212177d82a6",
+  "kind": "chat",
+  "user_id": "ana",
+  "payload": {
+    "question": "¿Qué es un checkpointer en LangGraph y para qué lo usamos en el curso?",
+    "code": null,
+    "level": "principiante",
+    "modules": null
+  },
+  "status": "DONE",
+  "result": {
+    "answer": "Un checkpointer en LangGraph es un componente que guarda una \"fotografía\" del estado del agente después de cada paso del flujo de trabajo. Esto permite que el sistema pueda recuperar el historial de la conversación o del proceso usando un identificador llamado `thread_id`. En el curso, usamos un checkpointer basado en SQLite, específicamente `AsyncSqliteSaver`, que es una versión asíncrona adecuada para proyectos que usan llamadas asíncronas como `ainvoke`.\n\nLa función principal del checkpointer es mantener la persistencia del estado acumulativo del agente para que, por ejemplo, si el usuario hace una segunda pregunta relacionada, el agente pueda recordar el contexto anterior y responder correctamente sin perder información. Esto es fundamental para que el agente tenga memoria y pueda manejar conversaciones multi-paso.\n\nAdemás, en producción se recomienda usar un checkpointer más robusto como PostgreSQL para manejar múltiples procesos o alta concurrencia, pero para desarrollo local SQLite es suficiente.\n\nEn resumen, el checkpointer nos ayuda a guardar y recuperar el estado del agente para que pueda mantener la memoria de la conversación y funcionar correctamente en ciclos de interacción con herramientas y el modelo.\n\nTodo esto está explicado en los fragmentos [1], [2] y [7].",
+    "citations": [
+      {
+        "number": 1,
+        "chunk_id": "5ac1687ddad60a96::7",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "No se guarda el razonamiento privado del modelo. La traza registra decisiones observables,\nargumentos, resultados y respuestas, que es lo necesario para auditar el flujo.\n\n## Checklist de la consigna\n\n- [x] Python 3.12+ y entorno virtual documentado.\n- [x] `StateGraph` con estado"
+      },
+      {
+        "number": 2,
+        "chunk_id": "5ac1687ddad60a96::5",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "### 3. El estado acumulativo\n\n```python\nclass AgentState(MessagesState):\n pass\n```\n\n`MessagesState` ya incorpora el historial y el reducer `add_messages`. Por eso cada\nobservación de una herramienta queda disponible para la siguiente decisión del agente.\n\n### 4. La arista condici"
+      },
+      {
+        "number": 7,
+        "chunk_id": "5ac1687ddad60a96::0",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "# Pre-entrega 5 — Agente ReAct con memoria persistente\n\nProyecto en Python 3.12 que implementa un agente asíncrono con LangGraph. El agente decide\npor sí mismo cuándo consultar una herramienta, puede recorrer el ciclo\n`agente → herramienta → agente` varias veces y conserva la con"
+      }
+    ],
+    "quiz": [],
+    "code_review": null,
+    "validation": {
+      "verdict": "approved",
+      "unsupported_claims": [],
+      "feedback": ""
+    },
+    "agents_used": [
+      "retriever",
+      "tutor",
+      "validator"
+    ],
+    "revisions": 0
+  },
+  "error": null,
+  "approval_request": null,
+  "approval_decision": null,
+  "created_at": "2026-10-19T22:39:19.480815Z",
+  "updated_at": "2026-10-19T22:39:27.148450Z"
+}

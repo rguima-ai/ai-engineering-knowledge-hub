@@ -1,0 +1,35 @@
+{
+  "conversation_id": "b1d36bc9-6d2a-4f94-8421-d31f46e8bf42",
+  "job_id": "a12bfca3-3265-4d38-9b0e-7caa79f5ff31",
+  "kind": "chat",
+  "user_id": "ana",
+  "payload": {
+    "question": "¿Cuál es la capital de Australia y cuántos habitantes tiene?",
+    "code": null,
+    "level": "intermedio",
+    "modules": null
+  },
+  "status": "DONE",
+  "result": {
+    "answer": "No encontré esto en el material del curso. El material proporcionado no contiene información sobre la capital de Australia ni su población.",
+    "citations": [],
+    "quiz": [],
+    "code_review": null,
+    "validation": {
+      "verdict": "approved",
+      "unsupported_claims": [],
+      "feedback": ""
+    },
+    "agents_used": [
+      "retriever",
+      "tutor",
+      "validator"
+    ],
+    "revisions": 0
+  },
+  "error": null,
+  "approval_request": null,
+  "approval_decision": null,
+  "created_at": "2026-10-19T22:40:24.179000Z",
+  "updated_at": "2026-10-19T22:40:30.615403Z"
+}

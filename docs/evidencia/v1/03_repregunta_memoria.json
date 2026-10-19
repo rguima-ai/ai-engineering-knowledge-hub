@@ -1,0 +1,60 @@
+{
+  "conversation_id": "1cea5c8b-da23-4798-aadc-b77cf9c46715",
+  "job_id": "d9f07dd4-6649-4ccb-a80a-0d665ed24479",
+  "kind": "chat",
+  "user_id": "ana",
+  "payload": {
+    "question": "De esos errores, ¿cuál arreglo primero y por qué? Mostrame cómo quedaría ese pedazo de código corregido.",
+    "code": null,
+    "level": "principiante",
+    "modules": null
+  },
+  "status": "DONE",
+  "result": {
+    "answer": "El primer error que deberías corregir es el estado que no acumula mensajes. Esto es fundamental porque el agente necesita recordar todo lo que pasó en la conversación para poder tomar buenas decisiones en cada paso. Si el estado no acumula mensajes, cada nuevo mensaje reemplaza al anterior y el agente pierde el historial, como si borraras las páginas anteriores de un cuaderno cada vez que escribís algo nuevo.\n\nPara arreglarlo, tenés que definir el estado del agente heredando de `MessagesState`, que ya tiene incorporado un campo `messages` que acumula los mensajes usando un \"reducer\" llamado `add_messages`. Esto es como tener un cuaderno donde cada mensaje nuevo se agrega al final sin borrar lo anterior.\n\nEl código corregido para esta parte quedaría así:\n\n```python\nfrom langgraph.graph import MessagesState\n\nclass AgentState(MessagesState):\n    pass  # Hereda todo lo necesario para acumular mensajes\n```\n\nEste cambio asegura que el historial de mensajes se mantenga y se vaya acumulando correctamente durante el ciclo del agente.\n\nEste arreglo es prioritario porque sin un estado acumulativo, el agente no puede funcionar correctamente en un ciclo ReAct, ya que pierde contexto y no puede decidir bien cuándo llamar a herramientas o responder.\n\nEste fragmento está explicado claramente en el material, donde se indica que `MessagesState` ya define `messages` con el reducer `add_messages`, para que cada nodo agregue mensajes al historial en lugar de borrar los anteriores [1][4][5].",
+    "citations": [
+      {
+        "number": 1,
+        "chunk_id": "24edbb1bfbf15a45::1",
+        "source": "sample_docs/modulo_05_langgraph/react_graph.py",
+        "title": "react_graph",
+        "module": 5,
+        "snippet": "class AgentState(MessagesState):\n \"\"\"Estado del grafo.\n\n MessagesState ya define `messages` con el reducer `add_messages`, por eso cada nodo\n agrega mensajes al historial en lugar de borrar los anteriores.\n \"\"\"\n\nSYSTEM_PROMPT = SystemMessage(\n content=(\n \"Sos un agente de soporte"
+      },
+      {
+        "number": 4,
+        "chunk_id": "5ac1687ddad60a96::5",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "### 3. El estado acumulativo\n\n```python\nclass AgentState(MessagesState):\n pass\n```\n\n`MessagesState` ya incorpora el historial y el reducer `add_messages`. Por eso cada\nobservación de una herramienta queda disponible para la siguiente decisión del agente.\n\n### 4. La arista condici"
+      },
+      {
+        "number": 5,
+        "chunk_id": "5ac1687ddad60a96::1",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "## Arquitectura\n\n```mermaid\nflowchart LR\n START((START)) --> AGENT[agent / LLM]\n AGENT -->|hay tool_calls| TOOLS[ToolNode]\n TOOLS -->|observación| AGENT\n AGENT -->|sin tool_calls| END((END))\n```\n\nEl estado hereda de `MessagesState`. Esa clase ya contiene:\n\n```python\nmessages: Ann"
+      }
+    ],
+    "quiz": [],
+    "code_review": null,
+    "validation": {
+      "verdict": "approved",
+      "unsupported_claims": [],
+      "feedback": ""
+    },
+    "agents_used": [
+      "retriever",
+      "tutor",
+      "validator"
+    ],
+    "revisions": 0
+  },
+  "error": null,
+  "approval_request": null,
+  "approval_decision": null,
+  "created_at": "2026-10-19T22:40:13.635358Z",
+  "updated_at": "2026-10-19T22:40:22.388089Z"
+}

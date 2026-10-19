@@ -1,0 +1,35 @@
+{
+  "job_id": "aca37972-fa3a-4528-b252-f744054b160b",
+  "kind": "ingest",
+  "user_id": "ana",
+  "conversation_id": null,
+  "payload": {
+    "filename": "apunte_lecciones_produccion.md",
+    "module": 7,
+    "bytes": 1211
+  },
+  "status": "WAITING_APPROVAL",
+  "result": null,
+  "error": null,
+  "approval_request": {
+    "type": "document_review",
+    "question": "¿Aprobás sumar este documento a la base compartida?",
+    "filename": "apunte_lecciones_produccion.md",
+    "uploaded_by": "ana",
+    "analysis": {
+      "module": 7,
+      "topic": "Lecciones aprendidas en producción con agentes y Docker",
+      "summary": "El documento detalla problemas reales encontrados al desplegar un agente en Docker, incluyendo un error de timeout con redis-py 8 y BLPOP, duplicación de costos en Phoenix debido a instrumentación doble, y pérdida de señales y trazas al reiniciar contenedores Docker. Se ofrecen soluciones prácticas para cada problema.",
+      "difficulty": "intermedio",
+      "quality_issues": []
+    },
+    "duplicates": [],
+    "stats": {
+      "chunks": 1,
+      "characters": 1203
+    }
+  },
+  "approval_decision": null,
+  "created_at": "2026-10-19T22:40:50.281202Z",
+  "updated_at": "2026-10-19T22:40:53.292385Z"
+}

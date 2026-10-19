@@ -1,0 +1,48 @@
+{
+  "job_id": "e812729f-1035-4141-9f17-fffb09f78062",
+  "kind": "ingest",
+  "user_id": "ana",
+  "conversation_id": null,
+  "payload": {
+    "filename": "apunte_memoria_conversacional.md",
+    "module": null,
+    "bytes": 1088
+  },
+  "status": "DONE",
+  "result": {
+    "status": "indexed",
+    "doc_id": "8ad213ef021b1fe9",
+    "source": "uploads/apunte_memoria_conversacional.md",
+    "module": 1,
+    "chunks": 1,
+    "reviewer": "admin"
+  },
+  "error": null,
+  "approval_request": {
+    "type": "document_review",
+    "question": "¿Aprobás sumar este documento a la base compartida?",
+    "filename": "apunte_memoria_conversacional.md",
+    "uploaded_by": "ana",
+    "analysis": {
+      "module": 1,
+      "topic": "Memoria conversacional y manejo del historial en LLMs",
+      "summary": "El documento describe un problema real en la gestión del historial conversacional para un LLM, donde el truncamiento de mensajes individuales causaba pérdida de información relevante en el prompt. Se destaca la importancia de controlar cómo se pasa el estado al modelo para evitar errores y contaminación de respuestas futuras.",
+      "difficulty": "intermedio",
+      "quality_issues": []
+    },
+    "duplicates": [],
+    "stats": {
+      "chunks": 1,
+      "characters": 1072
+    }
+  },
+  "approval_decision": {
+    "approved": true,
+    "comment": "",
+    "module": null,
+    "topic": null,
+    "reviewer": "admin"
+  },
+  "created_at": "2026-10-19T23:04:54.053429Z",
+  "updated_at": "2026-10-19T23:04:57.961991Z"
+}

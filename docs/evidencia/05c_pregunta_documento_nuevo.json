@@ -1,0 +1,52 @@
+{
+  "conversation_id": "1047bc13-ddb5-4922-b234-fe501ebcc12a",
+  "job_id": "daaf33eb-8573-49ce-bb59-a7b2f769945d",
+  "kind": "chat",
+  "user_id": "ana",
+  "payload": {
+    "question": "¿Por qué un agente con checkpointer puede olvidarse de parte de la conversación?",
+    "code": null,
+    "level": "intermedio",
+    "modules": null
+  },
+  "status": "DONE",
+  "result": {
+    "answer": "Un agente con checkpointer puede olvidarse de parte de la conversación porque, aunque el checkpointer guarda el estado completo del grafo después de cada paso (por ejemplo, en SQLite), el problema está en cómo se arma el historial que se le pasa al modelo para generar el prompt. En particular, la función que construye el historial para el prompt puede truncar cada mensaje anterior a un límite fijo (por ejemplo, 1.500 caracteres), y si una respuesta típica es más larga (por ejemplo, 4.000 caracteres), parte de la información queda fuera del prompt aunque esté guardada en el checkpointer.\n\nEsto significa que el modelo no recibe toda la información guardada y puede \"olvidar\" detalles importantes de la conversación previa. Además, recortar cada mensaje individualmente no es la mejor estrategia; es preferible controlar el límite total de tokens o mensajes (por ejemplo, usar una ventana de los últimos 6 mensajes) para evitar perder contexto relevante.\n\nPor lo tanto, persistir el estado con un checkpointer no garantiza que el modelo tenga acceso a toda la conversación pasada, porque el recorte del historial para el prompt puede eliminar información importante. También, una respuesta equivocada que queda en el historial puede contaminar las respuestas siguientes, ya que el modelo tiende a repetir la información más reciente.\n\nEn resumen, el checkpointer guarda el estado, pero el agente puede olvidarse de parte de la conversación si el historial que se le pasa al modelo está truncado o mal manejado en la construcción del prompt [4].",
+    "citations": [
+      {
+        "number": 1,
+        "chunk_id": "c68648d5dac6209f::1",
+        "source": "sample_docs/general/glosario_ai_engineering.html",
+        "title": "Glosario de AI Engineering",
+        "module": 0,
+        "snippet": "Checkpointer\n\nComponente de LangGraph que guarda el estado del grafo después de cada paso, asociado a un\n\nthread_id\n. Con un checkpointer persistente (SQLite, Redis, Postgres) una conversación\nsobrevive a un reinicio del servidor y un grafo interrumpido se puede reanudar con\n\nCom"
+      },
+      {
+        "number": 4,
+        "chunk_id": "8ad213ef021b1fe9::0",
+        "source": "uploads/apunte_memoria_conversacional.md",
+        "title": "Memoria conversacional: el historial que le llega al LLM",
+        "module": 1,
+        "snippet": "# Memoria conversacional: el historial que le llega al LLM\n\nApunte propio sobre un bug real del Knowledge Hub (Entrega Final).\n\n## El síntoma\n\nEl checkpointer guardaba la conversación completa, pero ante la repregunta \"recordame los\nerrores que encontraste\" el tutor listaba 4 de "
+      }
+    ],
+    "quiz": [],
+    "code_review": null,
+    "validation": {
+      "verdict": "approved",
+      "unsupported_claims": [],
+      "feedback": ""
+    },
+    "agents_used": [
+      "retriever",
+      "tutor",
+      "validator"
+    ],
+    "revisions": 0
+  },
+  "error": null,
+  "approval_request": null,
+  "approval_decision": null,
+  "created_at": "2026-10-19T23:08:23.952143Z",
+  "updated_at": "2026-10-19T23:08:32.308946Z"
+}

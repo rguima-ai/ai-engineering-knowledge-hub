@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Glosario de AI Engineering</title>
+<style>body{font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem}</style>
+</head>
+<body>
+<h1>Glosario de AI Engineering</h1>
+<p>Términos que aparecen a lo largo de las pre-entregas, explicados en criollo.</p>
+
+<h2>Async / await</h2>
+<p>Una función <code>async def</code> puede pausarse con <code>await</code> mientras espera una
+respuesta de red y dejar que el event loop atienda otras tareas. Mezclar una llamada bloqueante
+(por ejemplo <code>requests.get</code> o <code>time.sleep</code>) adentro de una corrutina congela
+todo el loop: hay que usar <code>httpx.AsyncClient</code>, <code>asyncio.sleep</code> o el SDK async
+oficial del proveedor.</p>
+
+<h2>LCEL</h2>
+<p>LangChain Expression Language. Compone pasos con el operador <code>|</code>:
+<code>prompt | llm | parser</code>. Cada paso es un Runnable con <code>invoke</code>,
+<code>ainvoke</code>, <code>stream</code> y <code>batch</code>.</p>
+
+<h2>Chunking</h2>
+<p>Partir un documento en fragmentos antes de indexarlo. Se mide en tokens, no en caracteres,
+porque el límite del modelo de embeddings está en tokens. Un solapamiento (overlap) de 10 % evita
+cortar una idea a la mitad.</p>
+
+<h2>Búsqueda híbrida</h2>
+<p>Combina BM25, que encuentra coincidencias exactas de palabras (nombres de funciones, siglas),
+con búsqueda vectorial, que encuentra textos de significado parecido. Los rankings se fusionan con
+Reciprocal Rank Fusion (RRF): cada documento suma <code>peso / (60 + puesto)</code> en cada lista.</p>
+
+<h2>Grounding</h2>
+<p>Una respuesta está fundamentada (grounded) cuando cada afirmación se puede rastrear a un
+fragmento recuperado. Si no hay fragmento que la respalde, el sistema tiene que decir que no lo
+sabe en lugar de inventar.</p>
+
+<h2>Supervisor</h2>
+<p>Nodo de un grafo multi-agente que solo decide: lee el estado compartido y elige qué
+especialista trabaja después. Los especialistas nunca se llaman entre sí; siempre vuelven al
+Supervisor.</p>
+
+<h2>Checkpointer</h2>
+<p>Componente de LangGraph que guarda el estado del grafo después de cada paso, asociado a un
+<code>thread_id</code>. Con un checkpointer persistente (SQLite, Redis, Postgres) una conversación
+sobrevive a un reinicio del servidor y un grafo interrumpido se puede reanudar con
+<code>Command(resume=...)</code>.</p>
+
+<h2>Human-in-the-loop</h2>
+<p>Pausa deliberada del grafo con <code>interrupt()</code> hasta que una persona aprueba o rechaza.
+Se reserva para acciones con efectos difíciles de deshacer.</p>
+
+<h2>Observabilidad</h2>
+<p>Registrar trazas (traces) y spans de cada llamada al LLM, herramienta y nodo para poder
+explicar qué pasó en una ejecución: latencia, tokens, costo, entradas y salidas. Arize Phoenix
+recibe las trazas por OpenTelemetry.</p>
+</body>
+</html>
