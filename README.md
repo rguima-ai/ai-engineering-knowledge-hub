@@ -10,14 +10,29 @@ Integra las siete pre-entregas del curso: **RAG híbrido** (BM25 + Pinecone) →
 multi-agente** en LangGraph → **API FastAPI** con cola en Redis y worker separado →
 **checkpointer persistente** (`AsyncRedisSaver`) → **trazabilidad** completa en Arize Phoenix.
 
-> **Estado de la evidencia:** completa. El 19/10/2026 se ejecutaron las corridas reales con
-> `gpt-4.1-mini`, `text-embedding-3-small` y Pinecone. El costo total fue **USD 0,09**. Ver
-> [Evidencia de las corridas reales](#evidencia-de-las-corridas-reales).
+> **Estado de la evidencia:** completa. El 19/10/2026 se ejecutaron 8 pruebas de punta a punta y
+> una prueba de carga con `gpt-4.1-mini`, `text-embedding-3-small` y Pinecone, cada una con su
+> árbol de spans y su costo en Phoenix. Ver [Evidencia](#evidencia-de-las-corridas-reales).
+
+### La arquitectura en cinco minutos
+
+La API **nunca ejecuta un LLM dentro del request**: valida con Pydantic, guarda el job en Redis,
+lo encola y responde `202`. Un **worker async** consume la cola y procesa varios jobs a la vez en
+un solo event loop (todo es espera de red). Cada pregunta recorre un **grafo de LangGraph** en el
+que un **Supervisor** con LLM decide el próximo paso, pero solo entre los que una política en
+código permite: el **Buscador** consulta el RAG a través de una **tool** validada
+(`search_course_material`: BM25 + Pinecone fusionados con RRF), el **Revisor** compara código con
+el material, el **Tutor** redacta con citas y el **Validador** rechaza lo que no tiene respaldo.
+El estado de cada conversación vive en un **checkpointer de Redis** (`AsyncRedisSaver`), así que
+sobrevive a reinicios; los documentos nuevos entran a la base solo después de una **aprobación
+humana** (`interrupt()` + `Command(resume)`). Cada job es una traza en **Arize Phoenix**, con
+tokens y costo por llamada. Se levanta con `docker compose up --build`, incluso sin API keys.
 
 ## Índice
 
 - [Qué resuelve](#qué-resuelve)
 - [Cómo cubre la consigna](#cómo-cubre-la-consigna)
+- [Cómo cubre la rúbrica](#cómo-cubre-la-rúbrica)
 - [Arquitectura](#arquitectura)
 - [Grafo del chat: Supervisor y especialistas](#grafo-del-chat-supervisor-y-especialistas)
 - [Grafo de ingesta con aprobación humana](#grafo-de-ingesta-con-aprobación-humana)
@@ -27,6 +42,7 @@ multi-agente** en LangGraph → **API FastAPI** con cola en Redis y worker separ
 - [Probarlo paso a paso](#probarlo-paso-a-paso)
 - [Evidencia de las corridas reales](#evidencia-de-las-corridas-reales)
 - [Problemas reales encontrados y corregidos](#problemas-reales-encontrados-y-corregidos)
+- [Auditoría async](#auditoría-async)
 - [Observabilidad](#observabilidad)
 - [Tests y calidad](#tests-y-calidad)
 - [Decisiones de diseño](#decisiones-de-diseño)
@@ -56,14 +72,25 @@ Para responderla, el sistema necesita:
 | Requisito | Dónde está |
 |---|---|
 | Acceso a conocimiento específico (RAG) | [app/rag/](app/rag/): loaders de PDF/HTML/MD/PY/IPYNB, chunking por tokens, BM25 + Pinecone fusionados con RRF |
+| El RAG como tool del agente investigador | [app/agents/tools.py](app/agents/tools.py): `search_course_material`, con `args_schema=SearchQuery` y salida validada como `RetrievedChunk` |
 | Razonamiento multi-paso con Supervisor | [app/agents/chat_graph.py](app/agents/chat_graph.py): Supervisor con LLM + 4 especialistas |
 | API profesional y documentada | [app/main.py](app/main.py): FastAPI, Swagger en `/docs`, validación Pydantic, 202 + polling |
-| Todo async | `ainvoke`, `AsyncOpenAI`, `PineconeAsyncio`, `redis.asyncio`, `httpx` en el cliente |
+| Todo async | Sin llamadas bloqueantes en el event loop: ver [Auditoría async](#auditoría-async). El worker procesa varios jobs a la vez ([prueba de carga](#evidencia-de-las-corridas-reales)) |
 | Checkpointer de LangGraph | `AsyncRedisSaver` en API y worker; la conversación sobrevive a `docker compose restart` |
-| Validación con Pydantic | Requests de la API, herramientas (`SearchQuery`, `SearchFilter`), salidas estructuradas de cada agente y configuración |
+| Validación con Pydantic | Requests y responses de la API, entrada y salida de la tool (`SearchQuery` → `RetrievedChunk`), salidas estructuradas de cada agente y configuración |
 | Trazabilidad | Phoenix vía OpenTelemetry/OpenInference: un trace por job, agrupado por sesión |
 | Sin hard-coding | Índice, namespace, región, modelos y límites salen de variables de entorno ([app/config.py](app/config.py)) |
 | Despliegue local | `docker compose up --build` levanta Redis, Phoenix, seed, API y worker |
+
+## Cómo cubre la rúbrica
+
+| Criterio (peso) | Evidencia en el repo |
+|---|---|
+| **Arquitectura y coherencia (30%)** | Las capas de los siete módulos integradas en un flujo único ([tabla](#qué-se-reutilizó-de-cada-pre-entrega)); separación API / worker / grafos / RAG / observabilidad / configuración ([estructura](#estructura)); diagramas de la arquitectura y de los dos grafos |
+| **Robustez técnica (25%)** | Async de punta a punta ([auditoría](#auditoría-async)), worker concurrente con tope, Pydantic en cada frontera, mypy strict, reintentos y 503 ante Redis caído, 50 tests ([tests](#tests-y-calidad)) |
+| **Persistencia y observabilidad (20%)** | `AsyncRedisSaver` con prueba de reinicio ([prueba 6](#evidencia-de-las-corridas-reales)); Phoenix con un árbol de spans y costo por ejecución, sesiones por conversación ([capturas](#capturas-de-phoenix)) |
+| **Documentación y despliegue (15%)** | Este README, diagramas Mermaid, decisiones de diseño, problemas reales encontrados; `docker compose up --build` probado desde un clon limpio y sin `.env` |
+| **Entorno y estándares (10%)** | Python 3.12 (`.python-version`, `requires-python`, imagen `python:3.12-slim`); dependencias en `pyproject.toml` y `requirements.txt`; todo configurable por variables de entorno con `.env.example` |
 
 ## Arquitectura
 
@@ -92,7 +119,7 @@ flowchart LR
 | Componente | Responsabilidad | Qué no hace |
 |---|---|---|
 | **API** (FastAPI) | Valida, identifica al usuario, persiste el job, encola y responde 202 | Nunca ejecuta un LLM dentro del request |
-| **Worker** | Consume la cola y ejecuta (o reanuda) el grafo que corresponde | No atiende HTTP |
+| **Worker** | Consume la cola y ejecuta (o reanuda) el grafo que corresponde, hasta `WORKER_CONCURRENCY` jobs a la vez | No atiende HTTP |
 | **Redis 8** | Jobs, cola, conversaciones, checkpoints de LangGraph y texto de los chunks | No razona |
 | **Pinecone** | Búsqueda vectorial densa | No guarda el texto para BM25 |
 | **seed** | Indexa `sample_docs/` y `knowledge_base/` antes de que arranquen API y worker | No pasa por aprobación: lo carga quien administra el repo |
@@ -130,7 +157,7 @@ flowchart TD
 | Agente | Qué hace | Salida (Pydantic) |
 |---|---|---|
 | **Supervisor** | En la primera vuelta arma un `RequestPlan` (intención, búsquedas, módulos, si hay cuestionario). En cada vuelta elige el próximo paso con un LLM | `RequestPlan`, `SupervisorDecision` |
-| **Buscador RAG** | Corre las búsquedas en paralelo sobre el retriever híbrido. Si el Validador pide más respaldo, reformula las búsquedas | Fragmentos numerados `[n]` |
+| **Buscador RAG** | Corre las búsquedas en paralelo con la tool `search_course_material`. Si el Validador pide más respaldo, reformula las búsquedas | Fragmentos `RetrievedChunk`, numerados `[n]` |
 | **Revisor de código** | Compara el código del alumno con los fragmentos: problemas con severidad, línea, corrección y fuentes | `CodeReview` |
 | **Tutor** | Redacta la respuesta en el nivel pedido (principiante, intermedio o avanzado), con citas `[n]` y cuestionario opcional | `TutorAnswer` |
 | **Validador** | Primero un control determinístico (que las citas existan y que haya citas, o que diga "no encontré"). Después un LLM verifica que cada afirmación tenga respaldo | `ValidationReport` |
@@ -176,7 +203,8 @@ flowchart LR
 | Metadatos | Módulo, tipo de documento, tema, título, fuente, quién lo subió y quién lo aprobó. Se filtra por módulo y tipo en las dos ramas |
 | Recuperación | BM25 (palabras exactas como `AsyncRedisSaver` o `lru_cache`) + vectores (significado), fusionados con **Reciprocal Rank Fusion** ponderado (`BM25_WEIGHT`) |
 | Filtro por módulo | Si lo elige el usuario, es estricto. Si lo infiere el LLM, es una **preferencia**: se busca filtrado y sin filtrar y se combinan los resultados (ver [problema 3](#3-un-documento-mal-clasificado-quedaba-invisible)) |
-| Idempotencia | El ID de un documento sale de su ruta: reindexarlo reemplaza sus chunks en lugar de duplicarlos |
+| Tool del agente | [app/agents/tools.py](app/agents/tools.py) expone el retriever como `StructuredTool`: LangChain rechaza una entrada inválida antes de ejecutar (por ejemplo, `k=99`) y la salida se valida como `RetrievedChunk`. En Phoenix aparece como span de tipo `TOOL` |
+| Idempotencia | El ID de un documento sale de su ruta: reindexarlo reemplaza sus chunks en lugar de duplicarlos. Subir de nuevo un archivo con el mismo nombre y aprobarlo reemplaza la versión anterior |
 
 **Modo sin cuentas externas.** Con `EMBEDDING_PROVIDER=hash` y `VECTOR_STORE=local`, todo
 funciona sin OpenAI ni Pinecone (embeddings determinísticos y vectores en Redis). Sirve para los
@@ -255,6 +283,7 @@ docker compose up --build
 | `MAX_UPLOAD_MB` | `10` | Tamaño máximo de un upload |
 | `MAX_GRAPH_STEPS` / `MAX_REVISIONS` | `24` / `1` | Topes del Supervisor |
 | `ADMIN_USERS` | `admin` | Quiénes aprueban documentos (separados por coma) |
+| `WORKER_CONCURRENCY` | `4` | Jobs que un worker procesa a la vez |
 | `REDIS_URL` | `redis://localhost:6379` | En Compose se pisa con `redis://redis:6379` |
 | `PHOENIX_COLLECTOR_ENDPOINT` / `PHOENIX_PROJECT_NAME` | `http://localhost:6006/v1/traces` / `ai-engineering-knowledge-hub` | Trazas |
 
@@ -302,52 +331,70 @@ python scripts/demo_client.py review <JOB_ID> --approve                         
 # 5. Persistencia: reiniciar todo y seguir la conversación
 docker compose restart
 python scripts/demo_client.py history <ID>
+
+# 6. Carga: cinco preguntas concurrentes
+python scripts/load_test.py
 ```
 
 ## Evidencia de las corridas reales
 
 Corridas del 19/10/2026 con `AGENT_MODE=openai` (`gpt-4.1-mini`), `text-embedding-3-small` y
 Pinecone serverless. Las respuestas completas están en [docs/evidencia/](docs/evidencia/) y las
-métricas salen de Phoenix. La primera tanda, anterior a las correcciones 1 a 5, quedó en
-[docs/evidencia/v1/](docs/evidencia/v1/).
+métricas salen de Phoenix. La primera tanda, anterior a las correcciones 3 a 5, quedó en
+[docs/evidencia/v1/](docs/evidencia/v1/), y las corridas del
+[problema 1](#1-la-memoria-olvidaba-parte-de-la-conversación) en
+[docs/evidencia/bug_historial/](docs/evidencia/bug_historial/).
 
 | # | Prueba | Agentes | Resultado | Latencia | Tokens | Costo |
 |---|---|---|---|---|---|---|
-| 1 | Pregunta conceptual, nivel principiante | Buscador → Tutor → Validador | Respuesta con 4 citas, aprobada | 8,0 s | 8 781 | USD 0,0040 |
-| 2 | **Consulta multipaso** con [un agente con errores](examples/agente_con_errores.py) | Buscador → Revisor → Tutor → Validador | Encontró **los 5 errores sembrados** (más 1 mejora) con su línea, explicó las correcciones para principiante y armó 5 preguntas | 20,8 s | 15 654 | USD 0,0081 |
-| 3 | Repregunta en la misma conversación | Buscador → Tutor → Validador | Entendió "de esos errores" sin repetir el código | 7,9 s | 10 705 | USD 0,0048 |
-| 4 | Pregunta fuera del material (capital de Australia) | Buscador → Tutor → Validador | "No encontré información… en el material del curso", sin citas | 10,6 s | 8 074 | USD 0,0024 |
-| 5a | Upload de un apunte | Agente de ingesta | `WAITING_APPROVAL` con análisis; `ana` recibe **403** al intentar aprobar | 2,8 s | 714 | USD 0,0004 |
-| 5b | Aprobación del admin | Reanudación con `Command(resume)` | Indexado: la base pasa de 16 a 17 documentos | 0,7 s | 0 | USD 0 |
-| 5c | Pregunta que necesita el apunte nuevo | Buscador → Tutor → Validador | Cita `uploads/apunte_memoria_conversacional.md` | 8,4 s | 9 724 | USD 0,0044 |
-| 6 | `docker compose restart` y repregunta | Buscador → Tutor → Validador | Recordó los 6 puntos de la revisión del turno 1; el historial leído del checkpointer tiene 6 mensajes | 6,8 s | 11 943 | USD 0,0048 |
+| 1 | Pregunta conceptual, nivel principiante | Buscador → Tutor → Validador | Respuesta con 5 citas, aprobada | 9,6 s | 9 868 | USD 0,0045 |
+| 2 | **Consulta multipaso** con [un agente con errores](examples/agente_con_errores.py) | Buscador → Revisor → Tutor → Validador | Encontró **los 5 errores sembrados** (más 2 mejoras) con su línea, explicó las correcciones para principiante y armó 5 preguntas | 25,9 s | 20 271 | USD 0,0109 |
+| 3 | Repregunta en la misma conversación | Buscador ×2 → Tutor → Validador | Entendió "de esos errores" sin repetir el código; el Supervisor decidió buscar una segunda vez | 13,0 s | 13 611 | USD 0,0062 |
+| 4 | Pregunta fuera del material (capital de Australia) | Buscador ×2 → Tutor → Validador | "No encontré esto en el material del curso", sin citas ni conocimiento propio | 7,5 s | 8 734 | USD 0,0037 |
+| 5a | Upload de un apunte | Agente de ingesta | `WAITING_APPROVAL` con análisis (módulo, tema, resumen); un usuario común recibe **403** al intentar aprobar | 1,9 s | 770 | USD 0,0004 |
+| 5b | Aprobación del admin | Reanudación con `Command(resume)` | Indexado en Pinecone y Redis | 0,8 s | 0 | USD 0 |
+| 5c | Pregunta que necesita el apunte nuevo | Buscador ×2 → Tutor → Validador | La cita principal es `uploads/apunte_lecciones_produccion.md` | 9,7 s | 9 647 | USD 0,0044 |
+| 6 | `docker compose restart` y repregunta | Buscador → Tutor → Validador | Recordó los 7 puntos de la revisión del turno 1; el historial leído del checkpointer tiene 6 mensajes | 7,2 s | 13 751 | USD 0,0055 |
+| 7 | [Carga](scripts/load_test.py): 5 preguntas concurrentes | 5 grafos en paralelo | Ver abajo | 18,4 s en total | 51 569 | USD 0,0235 |
+
+**Prueba de carga** ([docs/evidencia/07_carga_concurrente.json](docs/evidencia/07_carga_concurrente.json)):
+los cinco turnos suman 51,0 s de trabajo y terminaron en **18,4 s** de reloj (4 en paralelo, el
+quinto esperó un lugar). La API aceptó cada pregunta con un p95 de **11 ms** y `/health` respondió
+con un p95 de **12,6 ms** durante toda la carga (89 muestras): nada bloquea el event loop.
 
 ### Capturas de Phoenix
 
-**Trazas del proyecto.** Cada job es una traza de tipo `chain` con la pregunta como entrada y
-la respuesta como salida. Las de abajo, con tipo `unknown`, son de la primera tanda, antes de
-la corrección del [problema 5](#5-las-trazas-raíz-eran-una-caja-negra).
+Una captura por prueba, con el árbol de spans y el costo de la ejecución. Cada búsqueda aparece
+como un span `search_course_material` de tipo `TOOL` dentro del Buscador, y cada llamada a
+`ChatOpenAI` con sus tokens y su costo.
 
-![Trazas del proyecto](screenshots/01-trazas-del-proyecto.png)
+| Prueba | Captura |
+|---|---|
+| Todas las trazas del proyecto | [00-trazas-del-proyecto.png](screenshots/00-trazas-del-proyecto.png) |
+| 1. Pregunta de nivel principiante | [01-prueba-pregunta-principiante.png](screenshots/01-prueba-pregunta-principiante.png) |
+| 2. Consulta multipaso | [02-prueba-consulta-multipaso.png](screenshots/02-prueba-consulta-multipaso.png) |
+| 3. Repregunta con memoria | [03-prueba-repregunta-memoria.png](screenshots/03-prueba-repregunta-memoria.png) |
+| 4. Fuera del material | [04-prueba-fuera-del-material.png](screenshots/04-prueba-fuera-del-material.png) |
+| 5. Carga con aprobación humana (sesión con las dos trazas) | [05-prueba-carga-con-aprobacion.png](screenshots/05-prueba-carga-con-aprobacion.png) |
+| 5c. Pregunta sobre el documento nuevo | [05c-prueba-pregunta-documento-nuevo.png](screenshots/05c-prueba-pregunta-documento-nuevo.png) |
+| 6. Persistencia tras el reinicio (sesión con los tres turnos) | [06-prueba-persistencia-reinicio.png](screenshots/06-prueba-persistencia-reinicio.png) |
+| 7. Carga concurrente (usuarios `carga1` a `carga5`) | [07-prueba-carga-concurrente.png](screenshots/07-prueba-carga-concurrente.png) |
+| Sesiones | [08-sesiones.png](screenshots/08-sesiones.png) |
 
-**Consulta multipaso.** El árbol muestra cada vuelta del Supervisor (`supervisor.plan`,
-`supervisor.route`), los especialistas y cada llamada a `ChatOpenAI` con tokens y costo.
+**Consulta multipaso.** Cada vuelta del Supervisor (`supervisor.plan`, `supervisor.route`), las
+seis búsquedas de la tool, el Revisor, el Tutor y el Validador:
 
-![Traza de la consulta multipaso](screenshots/02-traza-consulta-multipaso.png)
+![Traza de la consulta multipaso](screenshots/02-prueba-consulta-multipaso.png)
 
-**Persistencia.** Los 3 turnos de la conversación quedan en la misma sesión; el tercero se
-ejecutó después de `docker compose restart`.
+**Persistencia.** Los tres turnos de la conversación en la misma sesión; el tercero se ejecutó
+después de `docker compose restart`:
 
-![Sesión con reinicio](screenshots/03-sesion-persistencia-reinicio.png)
+![Sesión con reinicio](screenshots/06-prueba-persistencia-reinicio.png)
 
-**Aprobación humana.** La carga es una sesión con dos trazas: el análisis que termina en
-"Esperando aprobación" y la reanudación tras la decisión del admin.
+**Aprobación humana.** El análisis termina en "Esperando aprobación" y la segunda traza es la
+reanudación tras la decisión del admin:
 
-![Sesión de carga con aprobación](screenshots/04-sesion-carga-con-aprobacion.png)
-
-**Sesiones.** Cada conversación y cada carga es una sesión, con su usuario.
-
-![Sesiones](screenshots/05-sesiones.png)
+![Sesión de carga con aprobación](screenshots/05-prueba-carga-con-aprobacion.png)
 
 ## Problemas reales encontrados y corregidos
 
@@ -402,6 +449,38 @@ La API reutilizaba conexiones muertas del pool. El cliente Redis compartido
 ([app/redis_client.py](app/redis_client.py)) verifica las conexiones ociosas y reintenta con
 backoff; si Redis sigue caído, la API responde 503 con `Retry-After`.
 
+### 8. Una llamada sincrónica escondida en `tiktoken`
+
+Al reconstruir la imagen, el servicio `seed` falló por un error de DNS: `tiktoken` descarga su
+vocabulario (`cl100k_base`) **la primera vez que se usa, con `requests` sincrónico**. Eso hacía
+depender el arranque de internet y metía una llamada de red bloqueante en el arranque async del
+RAG. El [Dockerfile](Dockerfile) ahora lo descarga al construir la imagen
+(`TIKTOKEN_CACHE_DIR`); se verificó que carga con el contenedor sin red (`--network none`).
+
+## Auditoría async
+
+Cada llamada externa del sistema y cómo se hace sin bloquear el event loop:
+
+| Llamada | Cliente | Dónde |
+|---|---|---|
+| LLM (los cinco agentes) | `ChatOpenAI.ainvoke` (usa `AsyncOpenAI` por dentro) | [app/agents/backends.py](app/agents/backends.py) |
+| Embeddings | `OpenAIEmbeddings.aembed_query` / `aembed_documents` | [app/rag/embeddings.py](app/rag/embeddings.py) |
+| Pinecone | `PineconeAsyncio` + `IndexAsyncio` (en la Pre-entrega 4 era `asyncio.to_thread`) | [app/rag/vector_store.py](app/rag/vector_store.py) |
+| Redis (jobs, cola, chunks) | `redis.asyncio` con health check y reintentos | [app/redis_client.py](app/redis_client.py) |
+| Checkpointer | `AsyncRedisSaver` | [app/main.py](app/main.py), [app/worker.py](app/worker.py) |
+| Phoenix | Exportador OTLP en lote (hilo propio de OpenTelemetry) | [app/observability.py](app/observability.py) |
+| Cliente de demo y prueba de carga | `httpx.AsyncClient` | [scripts/](scripts/) |
+| Parseo de PDF y chunking (CPU) | `asyncio.to_thread` | [app/rag/ingestion.py](app/rag/ingestion.py) |
+| Vocabulario de `tiktoken` | Descargado al construir la imagen ([problema 8](#8-una-llamada-sincrónica-escondida-en-tiktoken)) | [Dockerfile](Dockerfile) |
+
+**Si buscás `requests` o `.invoke(` en el repo**, vas a encontrar resultados, y son a propósito:
+[examples/agente_con_errores.py](examples/agente_con_errores.py) es el agente con errores
+sembrados de la demo (uno de ellos es justamente `model.invoke` dentro de `async def`), los JSON
+de [docs/evidencia/](docs/evidencia/) copian ese código como entrada de la prueba,
+[tests/test_chat_graph.py](tests/test_chat_graph.py) tiene un fragmento con `requests` como
+código a revisar, y [sample_docs/](sample_docs/) es material de la base de conocimiento, no código
+que se ejecute. En `app/` y `scripts/` no hay ninguna llamada sincrónica.
+
 ## Observabilidad
 
 - **Un trace por job** (`job.chat` o `job.ingest`) con `job.id`, `job.kind`, `job.outcome`,
@@ -418,7 +497,7 @@ backoff; si Redis sigue caído, la API responde 503 con `Retry-After`.
 ## Tests y calidad
 
 ```bash
-pytest          # 48 tests, sin red ni keys
+pytest          # 50 tests, sin red ni keys
 ruff check .
 ruff format --check .
 mypy            # strict
@@ -431,8 +510,9 @@ mypy            # strict
   y el parseo de las salidas estructuradas, que es donde fallan los fakes.
 - **Casos cubiertos**: política del Supervisor y correcciones (`policy_override`), revisiones
   agotadas, citas inválidas, filtro por módulo, historial largo, permisos de admin, turnos
-  concurrentes (409), Redis caído (503), uploads inválidos (413, 415, 422) y atributos de las
-  trazas.
+  concurrentes (409), Redis caído (503), uploads inválidos (413, 415, 422), atributos de las
+  trazas, validación de entrada y salida de la tool y concurrencia del worker (procesa en paralelo
+  sin pasar el tope de `WORKER_CONCURRENCY`).
 
 ## Decisiones de diseño
 
@@ -445,6 +525,8 @@ mypy            # strict
 | Embeddings de OpenAI en lugar de un modelo local | Cliente async nativo y una imagen de Docker unos 2 GB más liviana (sin torch) |
 | Redis 8 | `langgraph-checkpoint-redis` necesita RedisJSON y RediSearch, incluidos en Redis 8 |
 | El worker y la API son procesos separados | Un turno puede tardar 20 s; la API responde en milisegundos y escala por separado |
+| Concurrencia dentro del worker, no un proceso por job | Todo el trabajo es espera de red: un event loop atiende varios turnos. El semáforo se toma antes del `BLPOP`, así un worker no saca de la cola más de lo que puede procesar y el resto queda para otra réplica |
+| El RAG detrás de una tool | El agente no toca el retriever: la frontera tiene contrato Pydantic de entrada y salida y queda visible como span `TOOL` |
 | Modo simulado | Tests deterministas y una demo de infraestructura sin costo |
 
 ## Limitaciones conocidas
@@ -473,7 +555,7 @@ mypy            # strict
 | 1. Cliente async robusto | Timeouts, reintentos y `asyncio.timeout` en el cliente de demo |
 | 2. Pipeline LCEL validado | Salidas estructuradas con Pydantic en cada agente |
 | 3. RAG local | Loaders y metadatos por documento |
-| 4. RAG en Pinecone | Recuperación híbrida BM25 + vectores con RRF, ahora con `PineconeAsyncio` en lugar de `asyncio.to_thread` |
+| 4. RAG en Pinecone | Recuperación híbrida BM25 + vectores con RRF, ahora con `PineconeAsyncio` en lugar de `asyncio.to_thread`, expuesta como la tool del Buscador |
 | 5. Agente ReAct con memoria | Estado con `MessagesState` y checkpointer por `thread_id` |
 | 6. Supervisor multi-agente | Patrón Supervisor → especialistas → Supervisor |
 | 7. API de producción | FastAPI + cola Redis + worker, `interrupt()`/`Command(resume)`, Phoenix y el manejo de señales |
@@ -490,10 +572,10 @@ mypy            # strict
 │   ├── repositories.py    # Jobs, cola y conversaciones en Redis
 │   ├── redis_client.py    # Cliente con health check y reintentos
 │   ├── observability.py   # Phoenix
-│   ├── agents/            # Grafos, backends (OpenAI y simulado), prompts y schemas
+│   ├── agents/            # Grafos, tool de búsqueda, backends (OpenAI y simulado), prompts y schemas
 │   └── rag/               # Loaders, chunking, embeddings, vector store, retriever, ingesta
 ├── tests/
-├── scripts/demo_client.py
+├── scripts/               # Cliente de demo y prueba de carga (httpx async)
 ├── examples/              # Entradas de las corridas de la evidencia
 ├── sample_docs/           # Base de conocimiento pública incluida en el repo
 ├── knowledge_base/        # Material privado (no se versiona)
@@ -503,6 +585,7 @@ mypy            # strict
 ├── docker-compose.yml
 ├── pyproject.toml
 ├── requirements.txt
+├── .python-version
 └── .env.example
 ```
 

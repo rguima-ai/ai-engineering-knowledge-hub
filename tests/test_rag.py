@@ -1,7 +1,11 @@
 from typing import Any
 
+import pytest
+from pydantic import ValidationError
+
+from app.agents.tools import build_search_tool, search
 from app.rag import RAGComponents
-from app.rag.models import Chunk, DocType, SearchFilter, SearchQuery
+from app.rag.models import Chunk, DocType, RetrievedChunk, SearchFilter, SearchQuery
 from app.rag.vector_store import PineconeVectorStore
 from app.seed import discover
 from tests.conftest import ROOT
@@ -129,3 +133,20 @@ async def test_pinecone_store_traduce_filtros_y_metadata() -> None:
     assert index.calls[1][1]["filter"] == {
         "$and": [{"module": {"$in": [5]}}, {"doc_type": {"$in": ["code"]}}]
     }
+
+
+async def test_herramienta_de_busqueda_valida_entrada_y_salida(rag: RAGComponents) -> None:
+    """El RAG expuesto como tool: rechaza entradas inválidas y devuelve RetrievedChunk."""
+
+    await _index_all(rag)
+    tool = build_search_tool(rag.retriever)
+    assert tool.name == "search_course_material"
+
+    results = await search(tool, SearchQuery(query="¿Qué hace AsyncRedisSaver?", k=2))
+    assert all(isinstance(r, RetrievedChunk) for r in results)
+    assert results[0].source == "modulo_05_langgraph/checkpointer.md"
+
+    with pytest.raises(ValidationError):
+        await tool.ainvoke({"query": "x"})  # menos de 2 caracteres
+    with pytest.raises(ValidationError):
+        await tool.ainvoke({"query": "checkpointer", "k": 99})  # k fuera de rango

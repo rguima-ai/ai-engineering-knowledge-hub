@@ -182,23 +182,51 @@ class Worker:
         )
 
     async def run_forever(self) -> None:
-        logger.info("worker listo; esperando jobs en %s", self.jobs.queue_name)
-        while True:
-            try:
-                job_id = await self.jobs.dequeue(self.settings.worker_poll_timeout_seconds)
-            except (RedisConnectionError, RedisTimeoutError):
-                logger.warning("Redis no disponible; reintento en 1 s")
-                await asyncio.sleep(1)
-                continue
-            if job_id is None:
-                continue
-            try:
-                await self.process_job(job_id)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                # Ej.: Redis cae mientras se guarda FAILED. El loop sigue vivo.
-                logger.exception("error no recuperado con el job %s", job_id)
+        """Procesa hasta WORKER_CONCURRENCY jobs a la vez en este proceso.
+
+        Todo el trabajo es espera de red (LLM, Pinecone, Redis), así que un solo event loop
+        atiende varios turnos en paralelo. El semáforo se toma antes del BLPOP: el worker no
+        saca de la cola más jobs de los que puede procesar, y el resto queda para otra réplica.
+        """
+
+        logger.info(
+            "worker listo; esperando jobs en %s concurrency=%s",
+            self.jobs.queue_name,
+            self.settings.worker_concurrency,
+        )
+        slots = asyncio.Semaphore(self.settings.worker_concurrency)
+        running: set[asyncio.Task[None]] = set()
+        try:
+            while True:
+                await slots.acquire()
+                try:
+                    job_id = await self.jobs.dequeue(self.settings.worker_poll_timeout_seconds)
+                except (RedisConnectionError, RedisTimeoutError):
+                    slots.release()
+                    logger.warning("Redis no disponible; reintento en 1 s")
+                    await asyncio.sleep(1)
+                    continue
+                if job_id is None:
+                    slots.release()
+                    continue
+                task = asyncio.create_task(self._process_safely(job_id))
+                running.add(task)
+                task.add_done_callback(running.discard)
+                task.add_done_callback(lambda _: slots.release())
+        finally:
+            # SIGTERM: los jobs en curso se cancelan; el checkpoint conserva el último paso.
+            for task in running:
+                task.cancel()
+            await asyncio.gather(*running, return_exceptions=True)
+
+    async def _process_safely(self, job_id: str) -> None:
+        try:
+            await self.process_job(job_id)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # Ej.: Redis cae mientras se guarda FAILED. El loop sigue vivo.
+            logger.exception("error no recuperado con el job %s", job_id)
 
 
 async def main() -> None:

@@ -31,6 +31,7 @@ from app.agents.schemas import (
     TutorAnswer,
     ValidationReport,
 )
+from app.agents.tools import build_search_tool, search
 from app.config import Settings
 from app.rag.models import RetrievedChunk, SearchFilter, SearchQuery
 from app.rag.retriever import HybridRetriever
@@ -154,6 +155,8 @@ def build_chat_graph(
     settings: Settings,
     checkpointer: BaseCheckpointSaver[Any] | None = None,
 ) -> CompiledStateGraph[ChatState, None, Any, Any]:
+    search_tool = build_search_tool(retriever)
+
     def used(state: ChatState, agent: str) -> list[str]:
         return [*(state.get("agents_used") or []), agent]
 
@@ -228,7 +231,9 @@ def build_chat_graph(
         return list(
             await asyncio.gather(
                 *(
-                    retriever.search(SearchQuery(query=q, filter=search_filter, k=settings.top_k))
+                    search(
+                        search_tool, SearchQuery(query=q, filter=search_filter, k=settings.top_k)
+                    )
                     for q in queries
                 )
             )

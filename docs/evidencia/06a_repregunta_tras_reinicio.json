@@ -1,6 +1,6 @@
 {
-  "conversation_id": "b84a4407-61d6-4b71-b660-75d0dedda285",
-  "job_id": "1e00a68c-4720-42b5-946a-0d21f4a5ead7",
+  "conversation_id": "218b2a87-a19a-4af0-bc4e-5d2c14c97909",
+  "job_id": "037c7c3e-023a-4beb-a40d-232e1cfb7d6c",
   "kind": "chat",
   "user_id": "ana",
   "payload": {
@@ -11,26 +11,10 @@
   },
   "status": "DONE",
   "result": {
-    "answer": "1. El estado sobrescribe el historial porque no hereda de `MessagesState` con su reductor `add_messages`.\n2. Se usa `model.invoke` en vez de la versión asíncrona `ainvoke`, bloqueando el flujo.\n3. El modelo no está vinculado a las herramientas con `bind_tools`, por lo que no puede llamarlas.\n4. Falta la arista que vuelve del nodo de herramientas al agente para continuar el ciclo ReAct.\n5. No se usa un checkpointer ni `thread_id` para mantener memoria persistente entre turnos.\n6. El `ToolNode` no maneja errores con `handle_tool_errors=True`, por lo que fallos no se informan al agente.\n\nEstas son las líneas clave de los errores encontrados inicialmente en tu agente [1][3][5][7].",
+    "answer": "Aquí te dejo en una línea cada uno de los errores que encontré en tu agente al principio de la conversación:\n\n1. El estado del agente no hereda de `MessagesState`, por lo que no acumula el historial de mensajes.\n2. Usás `model.invoke` en una función asíncrona, lo que bloquea el event loop.\n3. No vinculaste el modelo con las herramientas usando `bind_tools`, impidiendo llamadas a herramientas.\n4. Falta la arista que conecta el nodo `tools` de vuelta a `agent`, cortando el ciclo ReAct.\n5. Compilás el grafo sin un checkpointer y llamás sin `thread_id`, perdiendo la memoria de la conversación.\n6. Creaste el nodo `ToolNode` sin `handle_tool_errors=True`, lo que puede romper el flujo ante errores.\n7. No definiste ni usaste el `SYSTEM_PROMPT` que guía el comportamiento del agente.\n\nEstas líneas resumen los problemas principales para que puedas priorizar las correcciones [1][6].",
     "citations": [
       {
         "number": 1,
-        "chunk_id": "5ac1687ddad60a96::0",
-        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
-        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
-        "module": 5,
-        "snippet": "# Pre-entrega 5 — Agente ReAct con memoria persistente\n\nProyecto en Python 3.12 que implementa un agente asíncrono con LangGraph. El agente decide\npor sí mismo cuándo consultar una herramienta, puede recorrer el ciclo\n`agente → herramienta → agente` varias veces y conserva la con"
-      },
-      {
-        "number": 3,
-        "chunk_id": "24edbb1bfbf15a45::0",
-        "source": "sample_docs/modulo_05_langgraph/react_graph.py",
-        "title": "react_graph",
-        "module": 5,
-        "snippet": "# Archivo: react_graph.py\n\"\"\"Definición del estado, los nodos y las aristas del agente ReAct.\"\"\"\n\nfrom __future__ import annotations\n\nfrom collections.abc import Sequence\nfrom typing import Any, Protocol\n\nfrom langchain_core.messages import BaseMessage, SystemMessage\nfrom langgra"
-      },
-      {
-        "number": 5,
         "chunk_id": "24edbb1bfbf15a45::1",
         "source": "sample_docs/modulo_05_langgraph/react_graph.py",
         "title": "react_graph",
@@ -38,12 +22,12 @@
         "snippet": "class AgentState(MessagesState):\n \"\"\"Estado del grafo.\n\n MessagesState ya define `messages` con el reducer `add_messages`, por eso cada nodo\n agrega mensajes al historial en lugar de borrar los anteriores.\n \"\"\"\n\nSYSTEM_PROMPT = SystemMessage(\n content=(\n \"Sos un agente de soporte"
       },
       {
-        "number": 7,
-        "chunk_id": "5ac1687ddad60a96::2",
+        "number": 6,
+        "chunk_id": "5ac1687ddad60a96::5",
         "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
         "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
         "module": 5,
-        "snippet": "La aplicación no contiene un `if pregunta == ...`. El LLM toma las decisiones mediante Tool\nCalling y la arista condicional `tools_condition` interpreta esas decisiones.\n\n## Estructura\n\n```text\nlanggraph-react-agent/\n├── src/react_agent/\n│ ├── config.py # Variables de entorno val"
+        "snippet": "### 3. El estado acumulativo\n\n```python\nclass AgentState(MessagesState):\n pass\n```\n\n`MessagesState` ya incorpora el historial y el reducer `add_messages`. Por eso cada\nobservación de una herramienta queda disponible para la siguiente decisión del agente.\n\n### 4. La arista condici"
       }
     ],
     "quiz": [],
@@ -63,6 +47,6 @@
   "error": null,
   "approval_request": null,
   "approval_decision": null,
-  "created_at": "2026-10-19T23:05:11.388807Z",
-  "updated_at": "2026-10-19T23:05:19.489704Z"
+  "created_at": "2026-10-20T00:03:51.622022Z",
+  "updated_at": "2026-10-20T00:03:59.099955Z"
 }

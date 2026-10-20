@@ -1,12 +1,12 @@
 {
-  "job_id": "e812729f-1035-4141-9f17-fffb09f78062",
+  "job_id": "383fc5b8-82b6-437e-992b-a1fc580ab0dc",
   "kind": "ingest",
   "user_id": "ana",
   "conversation_id": null,
   "payload": {
-    "filename": "apunte_memoria_conversacional.md",
-    "module": null,
-    "bytes": 1088
+    "filename": "apunte_lecciones_produccion.md",
+    "module": 7,
+    "bytes": 1211
   },
   "status": "WAITING_APPROVAL",
   "result": null,
@@ -14,22 +14,22 @@
   "approval_request": {
     "type": "document_review",
     "question": "¿Aprobás sumar este documento a la base compartida?",
-    "filename": "apunte_memoria_conversacional.md",
+    "filename": "apunte_lecciones_produccion.md",
     "uploaded_by": "ana",
     "analysis": {
-      "module": 1,
-      "topic": "Memoria conversacional y manejo del historial en LLMs",
-      "summary": "El documento describe un problema real en la gestión del historial conversacional para un LLM, donde el truncamiento de mensajes individuales causaba pérdida de información relevante en el prompt. Se destaca la importancia de controlar cómo se pasa el estado al modelo para evitar errores y contaminación de respuestas futuras.",
+      "module": 7,
+      "topic": "Lecciones aprendidas en producción con agentes y Docker",
+      "summary": "El documento detalla problemas reales encontrados al desplegar un agente en producción usando Docker, incluyendo problemas con redis-py 8 y BLPOP, duplicación de costos en Phoenix debido a instrumentación doble, y pérdida de señales y trazas al reiniciar contenedores Docker. Se ofrecen soluciones prácticas para cada problema.",
       "difficulty": "intermedio",
       "quality_issues": []
     },
     "duplicates": [],
     "stats": {
       "chunks": 1,
-      "characters": 1072
+      "characters": 1203
     }
   },
   "approval_decision": null,
-  "created_at": "2026-10-19T23:04:54.053429Z",
-  "updated_at": "2026-10-19T23:04:56.878058Z"
+  "created_at": "2026-10-20T00:03:33.237360Z",
+  "updated_at": "2026-10-20T00:03:35.152768Z"
 }

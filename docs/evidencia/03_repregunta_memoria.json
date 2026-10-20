@@ -1,6 +1,6 @@
 {
-  "conversation_id": "b84a4407-61d6-4b71-b660-75d0dedda285",
-  "job_id": "2790026a-fe0b-4713-965c-08e885b6e427",
+  "conversation_id": "218b2a87-a19a-4af0-bc4e-5d2c14c97909",
+  "job_id": "26ccca8c-be33-40eb-8a8c-3af841290eaa",
   "kind": "chat",
   "user_id": "ana",
   "payload": {
@@ -11,7 +11,7 @@
   },
   "status": "DONE",
   "result": {
-    "answer": "El primer arreglo que deberías hacer es que el estado del agente herede de `MessagesState` en lugar de usar una lista simple para `messages`. Esto es fundamental porque `MessagesState` ya tiene incorporado un mecanismo llamado \"reductor\" (`add_messages`) que acumula los mensajes en lugar de sobrescribirlos. Es como si tuvieras un cuaderno donde vas agregando notas nuevas sin borrar las anteriores, lo que permite que el agente recuerde todo el historial de la conversación y las observaciones de las herramientas.\n\nSi no haces esto primero, el agente perderá el historial y no podrá razonar correctamente en ciclos múltiples, lo que afecta todo el flujo.\n\nAquí te muestro cómo queda ese pedazo de código corregido, definiendo el estado del agente correctamente:\n\n```python\nfrom langgraph.graph import MessagesState\n\nclass AgentState(MessagesState):\n    pass  # Hereda todo lo necesario para acumular mensajes\n```\n\nEste cambio asegura que cada nuevo mensaje se agregue al historial y no se borren los anteriores, lo que es la base para que el agente funcione bien con memoria y pueda decidir cuándo llamar a herramientas o responder [1][2][5].",
+    "answer": "El primer arreglo que te recomiendo hacer es corregir el estado del agente para que herede de `MessagesState`. Esto es fundamental porque `MessagesState` ya tiene incorporado un mecanismo que acumula el historial de mensajes en lugar de sobrescribirlo cada vez que el agente recibe o envía un mensaje.\n\n**¿Por qué primero esto?**\n- Es como tener una libreta donde vas anotando toda la conversación. Si no usás `MessagesState`, cada vez que escribís una nota nueva, borrás las anteriores y perdés el contexto.\n- Sin el historial acumulado, el agente no puede recordar lo que pasó antes, lo que hace que no funcione bien el ciclo ReAct ni la memoria persistente.\n\n**Cómo corregirlo:**\n\nEn lugar de definir `AgentState` como un diccionario o clase vacía, hacelo heredar de `MessagesState` así:\n\n```python\nfrom langgraph.graph import MessagesState\n\nclass AgentState(MessagesState):\n    pass\n```\n\nEsto ya está explicado y ejemplificado en el material, donde `MessagesState` incluye el campo `messages` con el reductor `add_messages` que acumula los mensajes automáticamente [1][4][6].\n\nEste cambio es la base para que el resto del agente funcione correctamente, porque el historial de mensajes es la memoria del agente.\n\n---\n\n**Fragmento corregido del código:**\n\n```python\nfrom langgraph.graph import MessagesState\n\nclass AgentState(MessagesState):\n    pass\n```\n\nCon esto, el agente podrá acumular mensajes y mantener el contexto de la conversación, lo que es esencial para que luego puedas corregir otros errores como la invocación asíncrona, la vinculación con herramientas, el ciclo ReAct y la persistencia.\n\nSi querés, después seguimos con los otros arreglos, pero este es el primero y más importante para que el agente funcione bien.\n\n---\n\nFuentes:\n- Definición de `AgentState` heredando de `MessagesState` para acumular mensajes y mantener el historial [1][4][6].",
     "citations": [
       {
         "number": 1,
@@ -22,7 +22,7 @@
         "snippet": "class AgentState(MessagesState):\n \"\"\"Estado del grafo.\n\n MessagesState ya define `messages` con el reducer `add_messages`, por eso cada nodo\n agrega mensajes al historial en lugar de borrar los anteriores.\n \"\"\"\n\nSYSTEM_PROMPT = SystemMessage(\n content=(\n \"Sos un agente de soporte"
       },
       {
-        "number": 2,
+        "number": 4,
         "chunk_id": "5ac1687ddad60a96::5",
         "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
         "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
@@ -30,7 +30,7 @@
         "snippet": "### 3. El estado acumulativo\n\n```python\nclass AgentState(MessagesState):\n pass\n```\n\n`MessagesState` ya incorpora el historial y el reducer `add_messages`. Por eso cada\nobservación de una herramienta queda disponible para la siguiente decisión del agente.\n\n### 4. La arista condici"
       },
       {
-        "number": 5,
+        "number": 6,
         "chunk_id": "5ac1687ddad60a96::1",
         "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
         "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
@@ -47,6 +47,7 @@
     },
     "agents_used": [
       "retriever",
+      "retriever",
       "tutor",
       "validator"
     ],
@@ -55,6 +56,6 @@
   "error": null,
   "approval_request": null,
   "approval_decision": null,
-  "created_at": "2026-10-19T23:04:38.362308Z",
-  "updated_at": "2026-10-19T23:04:46.291244Z"
+  "created_at": "2026-10-20T00:03:11.523098Z",
+  "updated_at": "2026-10-20T00:03:24.524527Z"
 }

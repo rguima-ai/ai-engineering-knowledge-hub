@@ -1,0 +1,66 @@
+{
+  "requests": [
+    {
+      "question": "¿Qué diferencia hay entre BM25 y la búsqueda vectorial?",
+      "status": "DONE",
+      "accept_ms": 9.0,
+      "end_to_end_s": 8.67,
+      "agents_used": [
+        "retriever",
+        "tutor",
+        "validator"
+      ]
+    },
+    {
+      "question": "¿Para qué sirve el reducer add_messages en LangGraph?",
+      "status": "DONE",
+      "accept_ms": 11.2,
+      "end_to_end_s": 18.32,
+      "agents_used": [
+        "retriever",
+        "retriever",
+        "tutor",
+        "validator"
+      ]
+    },
+    {
+      "question": "¿Cómo decide el Supervisor qué especialista trabaja después?",
+      "status": "DONE",
+      "accept_ms": 9.6,
+      "end_to_end_s": 8.16,
+      "agents_used": [
+        "retriever",
+        "tutor",
+        "validator"
+      ]
+    },
+    {
+      "question": "¿Por qué la API devuelve 202 en lugar de esperar la respuesta del agente?",
+      "status": "DONE",
+      "accept_ms": 8.0,
+      "end_to_end_s": 8.16,
+      "agents_used": [
+        "retriever",
+        "tutor",
+        "validator"
+      ]
+    },
+    {
+      "question": "¿Qué es Reciprocal Rank Fusion?",
+      "status": "DONE",
+      "accept_ms": 11.3,
+      "end_to_end_s": 7.66,
+      "agents_used": [
+        "retriever",
+        "tutor",
+        "validator"
+      ]
+    }
+  ],
+  "accept_p95_ms": 11.3,
+  "end_to_end_p95_s": 18.32,
+  "sum_of_turns_s": 50.97,
+  "wall_time_s": 18.36,
+  "health_p95_ms_during_load": 12.6,
+  "health_samples": 89
+}

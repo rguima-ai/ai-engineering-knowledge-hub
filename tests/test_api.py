@@ -7,6 +7,7 @@ el Redis real.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -292,3 +293,39 @@ async def test_span_de_ingesta_antes_y_despues_de_aprobar(
     assert str((waiting.attributes or {})["output.value"]).startswith("Esperando aprobación")
     assert (resumed.attributes or {})["input.value"] == "Revisión de apunte.md: aprobado por admin"
     assert str((resumed.attributes or {})["output.value"]).startswith("Indexado uploads/apunte.md")
+
+
+# ---------- concurrencia del worker ----------
+async def test_worker_procesa_jobs_en_paralelo_con_tope(harness: Harness) -> None:
+    """Con WORKER_CONCURRENCY=2, cinco jobs se procesan de a dos, nunca de a uno ni de a tres."""
+
+    worker = harness.worker
+    worker.settings = worker.settings.model_copy(
+        update={"worker_concurrency": 2, "worker_poll_timeout_seconds": 1}
+    )
+    in_flight = peak = 0
+    done: list[str] = []
+    all_done = asyncio.Event()
+
+    async def slow_job(job_id: str) -> None:
+        nonlocal in_flight, peak
+        in_flight += 1
+        peak = max(peak, in_flight)
+        await asyncio.sleep(0.05)  # espera de red simulada
+        in_flight -= 1
+        done.append(job_id)
+        if len(done) == 5:
+            all_done.set()
+
+    worker.process_job = slow_job  # type: ignore[method-assign]
+    await worker.jobs.redis.rpush(worker.jobs.queue_name, *[f"j{i}" for i in range(5)])  # type: ignore[misc]
+
+    loop = asyncio.create_task(worker.run_forever())
+    async with asyncio.timeout(5):
+        await all_done.wait()
+    loop.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await loop
+
+    assert sorted(done) == [f"j{i}" for i in range(5)]
+    assert peak == 2

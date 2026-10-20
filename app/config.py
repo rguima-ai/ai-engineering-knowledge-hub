@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     key_prefix: str = "kh:"
     queue_name: str = "kh:jobs"
     worker_poll_timeout_seconds: int = Field(default=5, ge=1, le=60)
+    # Jobs que un worker procesa a la vez (todo es I/O async, no hace falta un proceso por job).
+    worker_concurrency: int = Field(default=4, ge=1, le=32)
     job_ttl_seconds: int = Field(default=86_400, ge=300)
     conversation_lock_seconds: int = Field(default=300, ge=30)
     # Usuarios (X-User-Id) que pueden aprobar documentos, separados por coma.

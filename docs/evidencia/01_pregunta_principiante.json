@@ -1,6 +1,6 @@
 {
-  "conversation_id": "ca88438e-47b3-458b-8914-73dc64830023",
-  "job_id": "18b5c1f5-c771-47cd-8914-80676ec92428",
+  "conversation_id": "63f4c5c1-e454-4a2a-affe-640886fbda59",
+  "job_id": "d035dcac-6776-452e-afc3-72d1b16facce",
   "kind": "chat",
   "user_id": "ana",
   "payload": {
@@ -11,18 +11,18 @@
   },
   "status": "DONE",
   "result": {
-    "answer": "Un checkpointer en LangGraph es un componente que guarda el estado del agente después de cada paso del flujo de trabajo. En el curso, usamos un checkpointer basado en SQLite, específicamente `AsyncSqliteSaver`, que almacena una \"fotografía\" del estado en una base de datos SQLite. Esto permite que el agente recuerde el historial de la conversación usando un identificador llamado `thread_id`, lo que facilita la persistencia y recuperación del estado para continuar la interacción sin perder contexto.\n\nEn términos simples, el checkpointer es como una cámara que saca fotos del estado del agente en cada paso para que, si volvemos a la conversación, podamos ver qué pasó antes y seguir desde ahí. Esto es fundamental para que el agente pueda tener memoria y manejar conversaciones multi-turno de forma autónoma.\n\nAdemás, se usa la variante asíncrona `AsyncSqliteSaver` porque el proyecto utiliza llamadas asíncronas (`ainvoke`), y esta versión es adecuada para ese tipo de ejecución.\n\nEn resumen, el checkpointer nos ayuda a guardar y recuperar el historial de la conversación para que el agente pueda mantener memoria y funcionar correctamente en el curso.\n\nEsta explicación está basada en los fragmentos [1], [2], [3] y [6].",
+    "answer": "Un checkpointer en LangGraph es un componente que guarda el estado del grafo después de cada paso, asociado a un identificador llamado `thread_id`. Esto permite que una conversación pueda sobrevivir a un reinicio del servidor y que un grafo interrumpido se pueda reanudar usando un comando especial (`Command(resume=...)`). En el curso, usamos checkpointers persistentes como SQLite para guardar una \"fotografía\" del estado después de cada paso, lo que facilita retomar conversaciones y mantener la memoria del agente entre interacciones.\n\nEn términos simples, imaginate que el checkpointer es como un guardapuntos en un videojuego: cada vez que avanzás un paso, se guarda dónde estás para que si se apaga la consola, puedas seguir jugando desde ahí y no desde el principio.\n\nAdemás, en el curso se usa la variante asíncrona `AsyncSqliteSaver` para manejar estos guardados de forma eficiente en un entorno que usa llamadas asíncronas (`ainvoke`), lo que es importante para que el agente pueda funcionar sin bloquearse mientras espera respuestas.\n\nEn resumen, el checkpointer es fundamental para que el agente tenga memoria persistente y pueda continuar conversaciones largas o retomarlas después de interrupciones, usando el mismo `thread_id` para identificar cada hilo de conversación.\n\nEsto está explicado en los fragmentos [1], [3], [6], [7] y [10].",
     "citations": [
       {
         "number": 1,
-        "chunk_id": "5ac1687ddad60a96::7",
-        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
-        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
-        "module": 5,
-        "snippet": "No se guarda el razonamiento privado del modelo. La traza registra decisiones observables,\nargumentos, resultados y respuestas, que es lo necesario para auditar el flujo.\n\n## Checklist de la consigna\n\n- [x] Python 3.12+ y entorno virtual documentado.\n- [x] `StateGraph` con estado"
+        "chunk_id": "c68648d5dac6209f::1",
+        "source": "sample_docs/general/glosario_ai_engineering.html",
+        "title": "Glosario de AI Engineering",
+        "module": 0,
+        "snippet": "Checkpointer\n\nComponente de LangGraph que guarda el estado del grafo después de cada paso, asociado a un\n\nthread_id\n. Con un checkpointer persistente (SQLite, Redis, Postgres) una conversación\nsobrevive a un reinicio del servidor y un grafo interrumpido se puede reanudar con\n\nCom"
       },
       {
-        "number": 2,
+        "number": 3,
         "chunk_id": "5ac1687ddad60a96::5",
         "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
         "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
@@ -30,7 +30,7 @@
         "snippet": "### 3. El estado acumulativo\n\n```python\nclass AgentState(MessagesState):\n pass\n```\n\n`MessagesState` ya incorpora el historial y el reducer `add_messages`. Por eso cada\nobservación de una herramienta queda disponible para la siguiente decisión del agente.\n\n### 4. La arista condici"
       },
       {
-        "number": 3,
+        "number": 6,
         "chunk_id": "24edbb1bfbf15a45::1",
         "source": "sample_docs/modulo_05_langgraph/react_graph.py",
         "title": "react_graph",
@@ -38,7 +38,15 @@
         "snippet": "class AgentState(MessagesState):\n \"\"\"Estado del grafo.\n\n MessagesState ya define `messages` con el reducer `add_messages`, por eso cada nodo\n agrega mensajes al historial en lugar de borrar los anteriores.\n \"\"\"\n\nSYSTEM_PROMPT = SystemMessage(\n content=(\n \"Sos un agente de soporte"
       },
       {
-        "number": 6,
+        "number": 7,
+        "chunk_id": "5ac1687ddad60a96::1",
+        "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
+        "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
+        "module": 5,
+        "snippet": "## Arquitectura\n\n```mermaid\nflowchart LR\n START((START)) --> AGENT[agent / LLM]\n AGENT -->|hay tool_calls| TOOLS[ToolNode]\n TOOLS -->|observación| AGENT\n AGENT -->|sin tool_calls| END((END))\n```\n\nEl estado hereda de `MessagesState`. Esa clase ya contiene:\n\n```python\nmessages: Ann"
+      },
+      {
+        "number": 10,
         "chunk_id": "5ac1687ddad60a96::0",
         "source": "sample_docs/modulo_05_langgraph/entrega5_agente_react.md",
         "title": "Pre-entrega 5 — Agente ReAct con memoria persistente",
@@ -63,6 +71,6 @@
   "error": null,
   "approval_request": null,
   "approval_decision": null,
-  "created_at": "2026-10-19T23:04:04.715097Z",
-  "updated_at": "2026-10-19T23:04:15.684969Z"
+  "created_at": "2026-10-20T00:02:34.556928Z",
+  "updated_at": "2026-10-20T00:02:44.189492Z"
 }

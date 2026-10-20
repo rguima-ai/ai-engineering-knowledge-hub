@@ -1,33 +1,33 @@
 {
-  "conversation_id": "1047bc13-ddb5-4922-b234-fe501ebcc12a",
-  "job_id": "daaf33eb-8573-49ce-bb59-a7b2f769945d",
+  "conversation_id": "efcc6480-93a9-4765-b1ae-d830ff33b920",
+  "job_id": "8bcd6f53-c390-40af-a48c-7b4cc8dcfa2a",
   "kind": "chat",
   "user_id": "ana",
   "payload": {
-    "question": "¿Por qué un agente con checkpointer puede olvidarse de parte de la conversación?",
+    "question": "¿Por qué el worker con BLPOP tiraba TimeoutError intermitentes y cómo se arregla?",
     "code": null,
     "level": "intermedio",
     "modules": null
   },
   "status": "DONE",
   "result": {
-    "answer": "Un agente con checkpointer puede olvidarse de parte de la conversación porque, aunque el checkpointer guarda el estado completo del grafo después de cada paso (por ejemplo, en SQLite), el problema está en cómo se arma el historial que se le pasa al modelo para generar el prompt. En particular, la función que construye el historial para el prompt puede truncar cada mensaje anterior a un límite fijo (por ejemplo, 1.500 caracteres), y si una respuesta típica es más larga (por ejemplo, 4.000 caracteres), parte de la información queda fuera del prompt aunque esté guardada en el checkpointer.\n\nEsto significa que el modelo no recibe toda la información guardada y puede \"olvidar\" detalles importantes de la conversación previa. Además, recortar cada mensaje individualmente no es la mejor estrategia; es preferible controlar el límite total de tokens o mensajes (por ejemplo, usar una ventana de los últimos 6 mensajes) para evitar perder contexto relevante.\n\nPor lo tanto, persistir el estado con un checkpointer no garantiza que el modelo tenga acceso a toda la conversación pasada, porque el recorte del historial para el prompt puede eliminar información importante. También, una respuesta equivocada que queda en el historial puede contaminar las respuestas siguientes, ya que el modelo tiende a repetir la información más reciente.\n\nEn resumen, el checkpointer guarda el estado, pero el agente puede olvidarse de parte de la conversación si el historial que se le pasa al modelo está truncado o mal manejado en la construcción del prompt [4].",
+    "answer": "El worker que usaba `BLPOP` con Redis tiraba `TimeoutError` intermitentes porque redis-py 8 tiene por defecto un `socket_timeout` de 5 segundos. Si el worker hace un `BLPOP` con un timeout también de 5 segundos, el socket del cliente corta la conexión antes que Redis, generando ese error intermitente.\n\nLa solución es configurar el `socket_timeout` de la conexión Redis del worker para que sea mayor que el timeout del comando bloqueante `BLPOP`, o directamente ponerlo en `None` para que no expire. Esto evita que el cliente cierre la conexión antes que Redis y elimina los `TimeoutError` intermitentes.\n\nAdemás, en la implementación del worker se usa un timeout para `BLPOP` igual a `WORKER_POLL_TIMEOUT_SECONDS + 5` para que el socket timeout sea mayor y se manejen errores transitorios con reintentos en lugar de terminar el proceso.\n\nEn resumen, el problema era un desajuste entre el timeout del socket y el timeout del comando `BLPOP`, y se arregla aumentando el `socket_timeout` del cliente Redis para que sea mayor que el timeout del `BLPOP` o poniéndolo en `None` para que no expire.\n\nEsto está explicado en el fragmento [1] y confirmado en [2].",
     "citations": [
       {
         "number": 1,
-        "chunk_id": "c68648d5dac6209f::1",
-        "source": "sample_docs/general/glosario_ai_engineering.html",
-        "title": "Glosario de AI Engineering",
-        "module": 0,
-        "snippet": "Checkpointer\n\nComponente de LangGraph que guarda el estado del grafo después de cada paso, asociado a un\n\nthread_id\n. Con un checkpointer persistente (SQLite, Redis, Postgres) una conversación\nsobrevive a un reinicio del servidor y un grafo interrumpido se puede reanudar con\n\nCom"
+        "chunk_id": "4c9214afabdd23b3::0",
+        "source": "uploads/apunte_lecciones_produccion.md",
+        "title": "Lecciones aprendidas en producción (Pre-entrega 7)",
+        "module": 7,
+        "snippet": "# Lecciones aprendidas en producción (Pre-entrega 7)\n\nApunte propio con problemas reales que aparecieron al llevar el agente a Docker.\n\n## redis-py 8 y BLPOP\n\nredis-py 8 trae por defecto `socket_timeout=5`. Si el worker hace `BLPOP` con un timeout de\n5 segundos, el socket corta a"
       },
       {
-        "number": 4,
-        "chunk_id": "8ad213ef021b1fe9::0",
-        "source": "uploads/apunte_memoria_conversacional.md",
-        "title": "Memoria conversacional: el historial que le llega al LLM",
-        "module": 1,
-        "snippet": "# Memoria conversacional: el historial que le llega al LLM\n\nApunte propio sobre un bug real del Knowledge Hub (Entrega Final).\n\n## El síntoma\n\nEl checkpointer guardaba la conversación completa, pero ante la repregunta \"recordame los\nerrores que encontraste\" el tutor listaba 4 de "
+        "number": 2,
+        "chunk_id": "4dea69d4daa23dd0::10",
+        "source": "sample_docs/modulo_07_produccion/entrega7_api_produccion.md",
+        "title": "Pre-entrega 7 — API de producción y monitoreo activo",
+        "module": 7,
+        "snippet": "## Limitaciones conocidas\n\n- La cola basada en Redis List es apropiada para esta pre-entrega. Un sistema crítico debería usar\n Redis Streams, consumer groups o una cola como Celery/ARQ para acknowledgements y reentrega si\n un worker muere después de `BLPOP`.\n- Si el proceso worke"
       }
     ],
     "quiz": [],
@@ -39,6 +39,7 @@
     },
     "agents_used": [
       "retriever",
+      "retriever",
       "tutor",
       "validator"
     ],
@@ -47,6 +48,6 @@
   "error": null,
   "approval_request": null,
   "approval_decision": null,
-  "created_at": "2026-10-19T23:08:23.952143Z",
-  "updated_at": "2026-10-19T23:08:32.308946Z"
+  "created_at": "2026-10-20T00:03:36.668767Z",
+  "updated_at": "2026-10-20T00:03:46.362950Z"
 }
