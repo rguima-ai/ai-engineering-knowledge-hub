@@ -26,7 +26,10 @@ el material, el **Tutor** redacta con citas y el **Validador** rechaza lo que no
 El estado de cada conversación vive en un **checkpointer de Redis** (`AsyncRedisSaver`), así que
 sobrevive a reinicios; los documentos nuevos entran a la base solo después de una **aprobación
 humana** (`interrupt()` + `Command(resume)`). Cada job es una traza en **Arize Phoenix**, con
-tokens y costo por llamada. Se levanta con `docker compose up --build`, incluso sin API keys.
+tokens y costo por llamada. Se levanta con `docker compose up --build`, incluso sin API keys, y
+se usa desde **http://localhost:8000**, una interfaz web de chat que es un cliente más de la API.
+
+![Interfaz web](screenshots/09-interfaz-chat.png)
 
 ## Índice
 
@@ -39,6 +42,7 @@ tokens y costo por llamada. Se levanta con `docker compose up --build`, incluso 
 - [RAG híbrido](#rag-híbrido)
 - [API](#api)
 - [Levantar el sistema](#levantar-el-sistema)
+- [Usarlo como usuario: la interfaz web](#usarlo-como-usuario-la-interfaz-web)
 - [Probarlo paso a paso](#probarlo-paso-a-paso)
 - [Evidencia de las corridas reales](#evidencia-de-las-corridas-reales)
 - [Problemas reales encontrados y corregidos](#problemas-reales-encontrados-y-corregidos)
@@ -221,12 +225,13 @@ identifica con el header `X-User-Id` (ver [limitaciones](#limitaciones-conocidas
 | `GET /conversations` | Lista las conversaciones del usuario | 200 |
 | `GET /conversations/{id}` | Historial, leído **del checkpointer** de LangGraph | 200, 404 |
 | `POST /conversations/{id}/messages` | Pregunta. Body: `question`, `code` (opcional), `level`, `modules` | 202, 404, **409** si hay un turno en curso, 422 |
-| `GET /jobs/{id}` | Estado y resultado: respuesta, citas, revisión de código, cuestionario, validación y agentes usados | 200, 404 |
+| `GET /jobs/{id}` | Estado y resultado: respuesta, citas, revisión de código, cuestionario, validación, agentes usados y `trace_id` de Phoenix | 200, 404 |
 | `POST /documents` | Sube un archivo (multipart, con `module` opcional) | 202, 413, 415, 422 |
 | `GET /documents/reviews` | Documentos esperando aprobación (**solo admins**) | 200, 403 |
 | `POST /documents/reviews/{job_id}` | Aprueba o rechaza. Body: `approved`, `comment`, `module`, `topic` | 202, 403, 404, 409 |
 | `GET /documents` | Catálogo de la base | 200 |
-| `GET /health` | Estado de Redis, modo de agentes, vector store y cantidad de documentos | 200 |
+| `GET /health` | Estado de Redis, modo de agentes, vector store, cantidad de documentos y URL de Phoenix | 200 |
+| `GET /` | La [interfaz web](#usarlo-como-usuario-la-interfaz-web) (fuera del esquema OpenAPI) | 200 |
 
 Si Redis no está disponible, la API responde **503 con `Retry-After`** en lugar de un 500.
 
@@ -265,6 +270,7 @@ docker compose up --build
 
 | Servicio | URL |
 |---|---|
+| **Interfaz web (chat)** | **http://localhost:8000** |
 | API y Swagger | http://localhost:8000/docs |
 | Phoenix | http://localhost:6006 (proyecto `ai-engineering-knowledge-hub`) |
 
@@ -286,6 +292,7 @@ docker compose up --build
 | `WORKER_CONCURRENCY` | `4` | Jobs que un worker procesa a la vez |
 | `REDIS_URL` | `redis://localhost:6379` | En Compose se pisa con `redis://redis:6379` |
 | `PHOENIX_COLLECTOR_ENDPOINT` / `PHOENIX_PROJECT_NAME` | `http://localhost:6006/v1/traces` / `ai-engineering-knowledge-hub` | Trazas |
+| `PHOENIX_UI_URL` | `http://localhost:6006` | Phoenix visto desde el navegador, para los links "Ver traza" |
 
 Si falta una key que el modo elegido necesita, el sistema **falla al arrancar** con un mensaje
 claro, no en la primera pregunta.
@@ -307,6 +314,32 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
+
+## Usarlo como usuario: la interfaz web
+
+Con el stack levantado, abrí **http://localhost:8000**:
+
+1. **Ingresá con un usuario** (por ejemplo `rocco`). No hay contraseña: es el mismo `X-User-Id`
+   de la API (ver [limitaciones](#limitaciones-conocidas)). El navegador lo recuerda.
+2. **Chat.** Escribí una pregunta, elegí el nivel y, si querés que revise código, tocá
+   "Adjuntar código" y pegalo. Cada respuesta muestra las citas `[n]`, si el Validador la aprobó,
+   qué agentes intervinieron, las **fuentes** desplegables, la **revisión de código** con la
+   severidad de cada problema, el **cuestionario** con "Ver respuesta" y un link
+   **"Ver traza en Phoenix"** que abre el árbol de spans de esa respuesta.
+3. **Historial.** La barra lateral lista tus conversaciones; al elegir una se recupera desde el
+   checkpointer, aunque el servidor se haya reiniciado.
+4. **Documentos.** Subí un PDF, Markdown, notebook, etc. El agente lo analiza y queda esperando
+   aprobación. Abajo está el catálogo de la base.
+5. **Revisión** (solo usuarios de `ADMIN_USERS`, por defecto `admin`). Muestra el análisis del
+   agente (resumen, módulo, tema, dificultad, duplicados); podés corregir el módulo o el tema y
+   aprobar o rechazar.
+
+![Revisión de documentos](screenshots/10-interfaz-revision.png)
+
+Es un único archivo, [app/web/index.html](app/web/index.html), con HTML, CSS y JavaScript sin
+dependencias externas: funciona sin internet, se adapta al celular y al modo oscuro, y todo el
+texto que llega del servidor se escapa antes de mostrarse. No tiene lógica propia: usa los mismos
+endpoints que Swagger y el cliente de demo.
 
 ## Probarlo paso a paso
 
@@ -380,6 +413,7 @@ como un span `search_course_material` de tipo `TOOL` dentro del Buscador, y cada
 | 6. Persistencia tras el reinicio (sesión con los tres turnos) | [06-prueba-persistencia-reinicio.png](screenshots/06-prueba-persistencia-reinicio.png) |
 | 7. Carga concurrente (usuarios `carga1` a `carga5`) | [07-prueba-carga-concurrente.png](screenshots/07-prueba-carga-concurrente.png) |
 | Sesiones | [08-sesiones.png](screenshots/08-sesiones.png) |
+| Interfaz web: chat y revisión | [09-interfaz-chat.png](screenshots/09-interfaz-chat.png), [10-interfaz-revision.png](screenshots/10-interfaz-revision.png) |
 
 **Consulta multipaso.** Cada vuelta del Supervisor (`supervisor.plan`, `supervisor.route`), las
 seis búsquedas de la tool, el Revisor, el Tutor y el Validador:
@@ -497,7 +531,7 @@ que se ejecute. En `app/` y `scripts/` no hay ninguna llamada sincrónica.
 ## Tests y calidad
 
 ```bash
-pytest          # 50 tests, sin red ni keys
+pytest          # 51 tests, sin red ni keys
 ruff check .
 ruff format --check .
 mypy            # strict
@@ -512,7 +546,9 @@ mypy            # strict
   agotadas, citas inválidas, filtro por módulo, historial largo, permisos de admin, turnos
   concurrentes (409), Redis caído (503), uploads inválidos (413, 415, 422), atributos de las
   trazas, validación de entrada y salida de la tool y concurrencia del worker (procesa en paralelo
-  sin pasar el tope de `WORKER_CONCURRENCY`).
+  sin pasar el tope de `WORKER_CONCURRENCY`), y que la interfaz web se sirva fuera del esquema
+  de la API. La interfaz además se probó de punta a punta en Chrome headless (chat con código,
+  upload, aprobación como admin y vista de celular de 390 px sin desbordes ni errores de JS).
 
 ## Decisiones de diseño
 
@@ -526,6 +562,7 @@ mypy            # strict
 | Redis 8 | `langgraph-checkpoint-redis` necesita RedisJSON y RediSearch, incluidos en Redis 8 |
 | El worker y la API son procesos separados | Un turno puede tardar 20 s; la API responde en milisegundos y escala por separado |
 | Concurrencia dentro del worker, no un proceso por job | Todo el trabajo es espera de red: un event loop atiende varios turnos. El semáforo se toma antes del `BLPOP`, así un worker no saca de la cola más de lo que puede procesar y el resto queda para otra réplica |
+| Interfaz web como archivo estático servido por la API | Sin contenedor ni dependencias nuevas (Streamlit sumaba un servicio y otro modelo de estado); es un cliente más de la API, así que no duplica lógica |
 | El RAG detrás de una tool | El agente no toca el retriever: la frontera tiene contrato Pydantic de entrada y salida y queda visible como span `TOOL` |
 | Modo simulado | Tests deterministas y una demo de infraestructura sin costo |
 
@@ -541,6 +578,9 @@ mypy            # strict
 - **Un job interrumpido queda en `RUNNING`.** Si el worker recibe SIGTERM en medio de un turno,
   el checkpoint conserva el último paso completo, pero el job no se reencola solo. Haría falta un
   barrido de jobs `RUNNING` vencidos al arrancar.
+- **El historial de la interfaz muestra solo el texto.** Al reabrir una conversación se ven las
+  respuestas, pero las citas, la revisión y el cuestionario aparecen solo en las respuestas
+  nuevas: el checkpointer guarda los mensajes, no el resultado estructurado de cada turno.
 - **Sin streaming.** La respuesta llega completa por polling. `astream_events` y SSE serían el
   siguiente paso.
 - **La clasificación automática puede fallar.** El agente de ingesta puede inferir mal el módulo.
@@ -572,6 +612,7 @@ mypy            # strict
 │   ├── repositories.py    # Jobs, cola y conversaciones en Redis
 │   ├── redis_client.py    # Cliente con health check y reintentos
 │   ├── observability.py   # Phoenix
+│   ├── web/index.html     # Interfaz web de chat (cliente de la API)
 │   ├── agents/            # Grafos, tool de búsqueda, backends (OpenAI y simulado), prompts y schemas
 │   └── rag/               # Loaders, chunking, embeddings, vector store, retriever, ingesta
 ├── tests/

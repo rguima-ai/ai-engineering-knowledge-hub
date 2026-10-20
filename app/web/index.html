@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knowledge Hub</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --panel: #ffffff; --panel-2: #efede8; --text: #1d1c1a; --muted: #6b6862;
+    --border: #dedbd4; --accent: #c2410c; --accent-soft: #fbe7dc; --ok: #15803d; --ok-soft: #dcfce7;
+    --warn: #a16207; --warn-soft: #fef3c7; --bad: #b91c1c; --bad-soft: #fee2e2;
+    --user: #1d1c1a; --user-text: #f6f5f2; --code: #f1efe9;
+    --radius: 12px; --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.04);
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141312; --panel: #1c1b19; --panel-2: #24221f; --text: #ecebe8; --muted: #9c9890;
+      --border: #34322e; --accent: #fb923c; --accent-soft: #3a2416; --ok: #4ade80; --ok-soft: #14301d;
+      --warn: #facc15; --warn-soft: #3a3010; --bad: #f87171; --bad-soft: #3b1717;
+      --user: #ecebe8; --user-text: #141312; --code: #24221f; --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  a { color: var(--accent); }
+  .hidden { display: none !important; }
+
+  /* ---------- login ---------- */
+  #login { min-height: 100%; display: grid; place-items: center; padding: 24px 16px; }
+  .login-card {
+    width: 100%; max-width: 420px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 16px; padding: 32px 28px; box-shadow: var(--shadow);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+  .brand-mark {
+    width: 30px; height: 30px; border-radius: 8px; background: var(--accent); color: #fff;
+    display: grid; place-items: center; font-size: 15px;
+  }
+  .login-card p { color: var(--muted); margin: 12px 0 24px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px; outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  .hint { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+  .btn {
+    border: 1px solid var(--border); background: var(--panel); border-radius: 10px;
+    padding: 9px 14px; font-weight: 600;
+  }
+  .btn:hover { background: var(--panel-2); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { filter: brightness(1.05); background: var(--accent); }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn-block { width: 100%; margin-top: 18px; padding: 11px; }
+
+  /* ---------- layout ---------- */
+  #app { height: 100%; display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr); }
+  /* Sin min-width: 0, un título largo sin saltos ensancha la columna y desborda en el celular. */
+  #app > *, #view-chat > *, .chat-main > * { min-width: 0; }
+  header.top {
+    display: flex; align-items: center; gap: 16px; padding: 10px 18px;
+    border-bottom: 1px solid var(--border); background: var(--panel);
+  }
+  nav.tabs { display: flex; gap: 4px; margin-left: 12px; }
+  nav.tabs button {
+    border: 0; background: transparent; padding: 7px 12px; border-radius: 8px; color: var(--muted);
+    font-weight: 600;
+  }
+  nav.tabs button[aria-selected=true] { background: var(--panel-2); color: var(--text); }
+  .top-right { margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 13px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+    background: var(--panel-2); color: var(--muted); font-size: 12.5px; white-space: nowrap;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }
+  .linkbtn { border: 0; background: none; color: var(--muted); text-decoration: underline; padding: 0; }
+
+  main { min-height: 0; }
+  .view { height: 100%; min-height: 0; }
+
+  /* ---------- chat ---------- */
+  #view-chat { display: grid; grid-template-columns: 270px minmax(0, 1fr); }
+  aside.sidebar {
+    border-right: 1px solid var(--border); background: var(--panel); display: flex;
+    flex-direction: column; min-height: 0;
+  }
+  .sidebar-head { padding: 14px; }
+  #conv-list { list-style: none; margin: 0; padding: 0 8px 12px; overflow-y: auto; flex: 1; }
+  #conv-list li button {
+    width: 100%; text-align: left; border: 0; background: transparent; padding: 9px 10px;
+    border-radius: 8px; display: block;
+  }
+  #conv-list li button:hover { background: var(--panel-2); }
+  #conv-list li button[aria-current=true] { background: var(--accent-soft); }
+  .conv-title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conv-date { display: block; font-size: 12px; color: var(--muted); }
+  .empty-side { color: var(--muted); font-size: 13px; padding: 8px 12px; }
+
+  .chat-main { display: grid; grid-template-rows: 1fr auto; min-height: 0; }
+  #messages { overflow-y: auto; padding: 24px 16px; }
+  .msgs-inner { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+  .welcome { text-align: center; color: var(--muted); padding: 48px 12px; }
+  .welcome h2 { color: var(--text); margin: 0 0 8px; font-size: 22px; }
+  .examples { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 20px; }
+  .examples button {
+    border: 1px solid var(--border); background: var(--panel); border-radius: 999px;
+    padding: 7px 14px; font-size: 13.5px;
+  }
+  .examples button:hover { border-color: var(--accent); }
+
+  .msg { display: flex; flex-direction: column; gap: 6px; }
+  .msg.user { align-items: flex-end; }
+  .bubble { max-width: 100%; border-radius: var(--radius); padding: 12px 16px; overflow-wrap: anywhere; }
+  .msg.user .bubble { background: var(--user); color: var(--user-text); max-width: 85%; white-space: pre-wrap; }
+  .msg.user .code-note { font-size: 12px; color: var(--muted); }
+  .msg.bot .bubble { background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow); }
+  .md p { margin: 0 0 10px; } .md p:last-child { margin-bottom: 0; }
+  .md h3, .md h4 { margin: 14px 0 6px; font-size: 15.5px; }
+  .md ul, .md ol { margin: 0 0 10px; padding-left: 22px; }
+  .md li { margin: 3px 0; }
+  .md code { font-family: var(--mono); font-size: 13px; background: var(--code); padding: 1px 5px; border-radius: 5px; }
+  .md pre { background: var(--code); padding: 12px; border-radius: 8px; overflow-x: auto; margin: 0 0 10px; }
+  .md pre code { background: none; padding: 0; }
+  .md hr { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
+  .md blockquote {
+    margin: 10px 0; padding: 8px 12px; border-left: 3px solid var(--warn); background: var(--warn-soft);
+    border-radius: 0 8px 8px 0;
+  }
+  sup.cite {
+    font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accent-soft);
+    padding: 0 5px; border-radius: 5px; margin: 0 1px; cursor: help;
+  }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+  .chip { background: var(--panel-2); border-radius: 6px; padding: 1px 7px; }
+  .badge { border-radius: 6px; padding: 1px 8px; font-weight: 600; }
+  .badge.ok { background: var(--ok-soft); color: var(--ok); }
+  .badge.warn { background: var(--warn-soft); color: var(--warn); }
+  details.extra {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 0 14px;
+  }
+  details.extra summary { cursor: pointer; padding: 10px 0; font-weight: 600; font-size: 14px; }
+  details.extra[open] { padding-bottom: 12px; }
+  .source { border-top: 1px solid var(--border); padding: 8px 0; font-size: 13.5px; }
+  .source:first-of-type { border-top: 0; }
+  .source b { color: var(--accent); }
+  .snippet { color: var(--muted); font-size: 12.5px; white-space: pre-wrap; margin-top: 4px; font-family: var(--mono); }
+  .issue { border-top: 1px solid var(--border); padding: 8px 0; font-size: 13.5px; }
+  .issue:first-of-type { border-top: 0; }
+  .sev { font-size: 11.5px; font-weight: 700; text-transform: uppercase; padding: 1px 7px; border-radius: 5px; }
+  .sev.alta { background: var(--bad-soft); color: var(--bad); }
+  .sev.media { background: var(--warn-soft); color: var(--warn); }
+  .sev.baja { background: var(--panel-2); color: var(--muted); }
+  .quiz-q { border-top: 1px solid var(--border); padding: 10px 0; font-size: 14px; }
+  .quiz-q:first-of-type { border-top: 0; }
+  .quiz-q ol { margin: 6px 0; padding-left: 22px; }
+  .quiz-q li.correct { color: var(--ok); font-weight: 600; }
+  .thinking { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+  .spinner {
+    width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border);
+    border-top-color: var(--accent); animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-box { background: var(--bad-soft); color: var(--bad); border-radius: 10px; padding: 10px 14px; font-size: 14px; }
+
+  .composer { border-top: 1px solid var(--border); background: var(--panel); padding: 12px 16px; }
+  .composer-inner { max-width: 820px; margin: 0 auto; }
+  .composer textarea { resize: none; min-height: 48px; max-height: 200px; }
+  #code-input { font-family: var(--mono); font-size: 13px; min-height: 120px; max-height: 300px; resize: vertical; margin-top: 8px; }
+  .composer-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+  .composer-row select { width: auto; padding: 7px 10px; }
+  .composer-row .spacer { flex: 1; }
+  .toggle { border: 1px dashed var(--border); background: transparent; border-radius: 8px; padding: 6px 10px; font-size: 13px; color: var(--muted); }
+  .toggle[aria-pressed=true] { border-style: solid; border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- documentos y revisión ---------- */
+  .page { height: 100%; overflow-y: auto; padding: 24px 16px; }
+  .page-inner { max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+  .card h2 { margin: 0 0 4px; font-size: 18px; }
+  .card > p.sub { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 160px; gap: 12px; align-items: end; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
+  td.src { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+  .status-box { margin-top: 14px; font-size: 14px; }
+  .review { border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .review + .review { margin-top: 12px; }
+  .review h3 { margin: 0 0 4px; font-size: 16px; word-break: break-all; }
+  .kv { display: grid; grid-template-columns: 120px 1fr; gap: 4px 12px; font-size: 14px; margin: 10px 0; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; }
+  .review-actions { display: grid; grid-template-columns: 110px 1fr auto auto; gap: 8px; align-items: end; margin-top: 12px; }
+  .btn-ok { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .btn-bad { color: var(--bad); }
+
+  @media (max-width: 760px) {
+    header.top { flex-wrap: wrap; gap: 8px; padding: 10px 16px; }
+    nav.tabs { margin-left: 0; order: 3; width: 100%; }
+    .top-right .pill.mode { display: none; }
+    #view-chat { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+    aside.sidebar { border-right: 0; border-bottom: 1px solid var(--border); max-height: 34vh; }
+    .msg.user .bubble { max-width: 100%; }
+    .grid-2, .review-actions { grid-template-columns: 1fr; }
+    .kv { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ======================= ingreso ======================= -->
+<section id="login" class="hidden">
+  <form class="login-card" id="login-form">
+    <div class="brand"><span class="brand-mark">KH</span> Knowledge Hub</div>
+    <p>Tutor del curso de AI Engineering. Responde solo con el material del equipo y cita cada fuente.</p>
+    <label for="login-user">Tu usuario</label>
+    <input type="text" id="login-user" autocomplete="username" placeholder="por ejemplo: rocco" required
+           pattern="[A-Za-z0-9_.@\-]{2,60}" maxlength="60">
+    <div class="hint">Letras, números, punto, guion o @. Los usuarios admin pueden aprobar documentos.</div>
+    <button class="btn btn-primary btn-block" type="submit">Entrar</button>
+  </form>
+</section>
+
+<!-- ======================= aplicación ======================= -->
+<div id="app" class="hidden">
+  <header class="top">
+    <div class="brand"><span class="brand-mark">KH</span> <span>Knowledge Hub</span></div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-view="chat" aria-selected="true">Chat</button>
+      <button role="tab" data-view="docs" aria-selected="false">Documentos</button>
+      <button role="tab" data-view="review" aria-selected="false" class="hidden" id="tab-review">Revisión</button>
+    </nav>
+    <div class="top-right">
+      <span class="pill mode" id="health-pill"><span class="dot"></span><span>conectando…</span></span>
+      <span>👤 <b id="current-user"></b></span>
+      <button class="linkbtn" id="logout">salir</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ---------- chat ---------- -->
+    <section class="view" id="view-chat">
+      <aside class="sidebar">
+        <div class="sidebar-head"><button class="btn btn-primary" id="new-conv" style="width:100%">+ Nueva conversación</button></div>
+        <ul id="conv-list" aria-label="Tus conversaciones"></ul>
+      </aside>
+      <div class="chat-main">
+        <div id="messages"><div class="msgs-inner" id="msgs-inner"></div></div>
+        <form class="composer" id="composer">
+          <div class="composer-inner">
+            <label for="question" class="hidden">Tu pregunta</label>
+            <textarea id="question" rows="1" placeholder="Preguntá sobre el material del curso…" maxlength="4000"></textarea>
+            <textarea id="code-input" class="hidden" placeholder="Pegá acá el código que querés que revise" maxlength="30000" aria-label="Código a revisar"></textarea>
+            <div class="composer-row">
+              <label for="level" style="margin:0;font-weight:500;color:var(--muted)">Nivel</label>
+              <select id="level">
+                <option value="principiante">Principiante</option>
+                <option value="intermedio" selected>Intermedio</option>
+                <option value="avanzado">Avanzado</option>
+              </select>
+              <button type="button" class="toggle" id="toggle-code" aria-pressed="false">&lt;/&gt; Adjuntar código</button>
+              <span class="spacer"></span>
+              <button class="btn btn-primary" type="submit" id="send">Enviar</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ---------- documentos ---------- -->
+    <section class="view hidden" id="view-docs">
+      <div class="page"><div class="page-inner">
+        <div class="card">
+          <h2>Subir un documento</h2>
+          <p class="sub">PDF, HTML, Markdown, Python, notebook o texto (máx. 10 MB). Un agente lo analiza y queda esperando que un admin lo apruebe antes de sumarse a la base.</p>
+          <form id="upload-form" class="grid-2">
+            <div>
+              <label for="upload-file">Archivo</label>
+              <input type="file" id="upload-file" accept=".pdf,.html,.htm,.md,.markdown,.py,.ipynb,.txt" required>
+            </div>
+            <div>
+              <label for="upload-module">Módulo (opcional)</label>
+              <input type="number" id="upload-module" min="0" max="20" placeholder="auto">
+            </div>
+            <div style="grid-column:1/-1"><button class="btn btn-primary" type="submit" id="upload-btn">Subir y enviar a revisión</button></div>
+          </form>
+          <div class="status-box" id="upload-status"></div>
+        </div>
+        <div class="card">
+          <h2>Base de conocimiento</h2>
+          <p class="sub" id="docs-count">Cargando…</p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Documento</th><th>Módulo</th><th>Tipo</th><th>Fragmentos</th><th>Aprobado por</th></tr></thead>
+            <tbody id="docs-body"></tbody>
+          </table></div>
+        </div>
+      </div></div>
+    </section>
+
+    <!-- ---------- revisión (admins) ---------- -->
+    <section class="view hidden" id="view-review">
+      <div class="page"><div class="page-inner">
+        <div class="card">
+          <h2>Documentos esperando aprobación</h2>
+          <p class="sub">Revisá el análisis del agente. Podés corregir el módulo o el tema antes de aprobar.</p>
+          <div id="review-list"></div>
+        </div>
+      </div></div>
+    </section>
+  </main>
+</div>
+
+<script>
+"use strict";
+// Cliente de la API del Knowledge Hub: no tiene lógica de negocio, solo llama a los endpoints.
+// Todo texto que viene del servidor pasa por esc() o textContent antes de llegar al DOM.
+
+const $ = (sel) => document.querySelector(sel);
+const state = { user: null, conversationId: null, busy: false, phoenix: null };
+const EXAMPLES = [
+  "¿Qué es un checkpointer en LangGraph?",
+  "¿Cómo funciona la búsqueda híbrida con RRF?",
+  "¿Por qué la API devuelve 202 en lugar de esperar al agente?",
+  "Generame 3 preguntas sobre el patrón Supervisor",
+];
+
+// ---------- almacenamiento local (puede no estar disponible) ----------
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* sin persistencia local */ } },
+  del(k) { try { localStorage.removeItem(k); } catch { /* idem */ } },
+};
+
+// ---------- API ----------
+class ApiError extends Error {
+  constructor(status, detail) { super(detail); this.status = status; }
+}
+async function api(path, { method = "GET", body, form } = {}) {
+  const headers = { "X-User-Id": state.user };
+  let payload;
+  if (form) payload = form;
+  else if (body !== undefined) { headers["Content-Type"] = "application/json"; payload = JSON.stringify(body); }
+  const res = await fetch(path, { method, headers, body: payload });
+  let data = null;
+  try { data = await res.json(); } catch { /* respuesta sin cuerpo */ }
+  if (!res.ok) {
+    let detail = data && data.detail;
+    if (Array.isArray(detail)) detail = detail.map((d) => d.msg).join("; ");
+    throw new ApiError(res.status, detail || `Error ${res.status}`);
+  }
+  return data;
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function waitJob(jobId, until = ["DONE", "FAILED"], onTick) {
+  const started = Date.now();
+  while (Date.now() - started < 240000) {
+    const job = await api(`/jobs/${encodeURIComponent(jobId)}`);
+    if (until.includes(job.status)) return job;
+    if (onTick) onTick(job);
+    await sleep(1000);
+  }
+  throw new Error("La respuesta está tardando demasiado. Probá recargar en un rato.");
+}
+
+// ---------- utilidades de texto ----------
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function inline(s) {
+  // s ya viene escapado: solo se agregan etiquetas propias.
+  return s
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\[(\d{1,2})\]/g, '<sup class="cite" data-n="$1">$1</sup>');
+}
+function renderMarkdown(text) {
+  const out = [];
+  const parts = esc(text).split(/```[^\n]*\n?/);
+  parts.forEach((part, i) => {
+    if (i % 2 === 1) { out.push(`<pre><code>${part.replace(/\n$/, "")}</code></pre>`); return; }
+    let list = null; let para = [];
+    const flushPara = () => { if (para.length) { out.push(`<p>${inline(para.join("<br>"))}</p>`); para = []; } };
+    const flushList = () => { if (list) { out.push(`<${list.tag}${list.start > 1 ? ` start="${list.start}"` : ""}>${list.items.map((x) => `<li>${inline(x)}</li>`).join("")}</${list.tag}>`); list = null; } };
+    for (const raw of part.split("\n")) {
+      const line = raw.trimEnd();
+      let m;
+      if (!line.trim()) { flushPara(); flushList(); continue; }
+      if (/^\s*([-*_])\1{2,}\s*$/.test(line)) { flushPara(); flushList(); out.push("<hr>"); continue; }
+      if ((m = line.match(/^#{1,4}\s+(.*)/))) { flushPara(); flushList(); out.push(`<h4>${inline(m[1])}</h4>`); continue; }
+      if ((m = line.match(/^&gt;\s?(.*)/))) { flushPara(); flushList(); out.push(`<blockquote>${inline(m[1])}</blockquote>`); continue; }
+      if ((m = line.match(/^\s*[-*]\s+(.*)/))) { flushPara(); if (!list || list.tag !== "ul") { flushList(); list = { tag: "ul", items: [] }; } list.items.push(m[1]); continue; }
+      if ((m = line.match(/^\s*(\d+)[.)]\s+(.*)/))) { flushPara(); if (!list || list.tag !== "ol") { flushList(); list = { tag: "ol", items: [], start: Number(m[1]) }; } list.items.push(m[2]); continue; }
+      if (list && /^\s{2,}\S/.test(raw)) { list.items[list.items.length - 1] += "<br>" + line.trim(); continue; }
+      flushList(); para.push(line);
+    }
+    flushPara(); flushList();
+  });
+  return out.join("");
+}
+function el(tag, cls, text) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+function fmtDate(iso) {
+  try { return new Date(iso).toLocaleString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }); }
+  catch { return ""; }
+}
+
+// ---------- ingreso ----------
+function showLogin() { $("#app").classList.add("hidden"); $("#login").classList.remove("hidden"); $("#login-user").focus(); }
+async function enter(user) {
+  state.user = user;
+  store.set("kh.user", user);
+  $("#current-user").textContent = user;
+  $("#login").classList.add("hidden");
+  $("#app").classList.remove("hidden");
+  refreshHealth();
+  checkAdmin();
+  await loadConversations();
+  const last = store.get(`kh.conv.${user}`);
+  if (last) openConversation(last).catch(() => newConversationView());
+  else newConversationView();
+}
+$("#login-form").addEventListener("submit", (e) => { e.preventDefault(); enter($("#login-user").value.trim()); });
+$("#logout").addEventListener("click", () => { store.del("kh.user"); state.user = null; state.conversationId = null; showLogin(); });
+
+async function refreshHealth() {
+  const pill = $("#health-pill");
+  try {
+    const h = await api("/health");
+    state.phoenix = h.phoenix_ui_url;
+    pill.innerHTML = `<span class="dot ${h.status === "ok" ? "ok" : "bad"}"></span><span>${esc(h.agent_mode === "openai" ? "modo real" : "modo simulado")} · ${esc(h.documents)} documentos</span>`;
+  } catch {
+    pill.innerHTML = '<span class="dot bad"></span><span>sin conexión</span>';
+  }
+}
+async function checkAdmin() {
+  try { await api("/documents/reviews"); $("#tab-review").classList.remove("hidden"); }
+  catch { $("#tab-review").classList.add("hidden"); }
+}
+
+// ---------- pestañas ----------
+document.querySelectorAll("nav.tabs button").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
+function showView(name) {
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === name)));
+  ["chat", "docs", "review"].forEach((v) => $(`#view-${v}`).classList.toggle("hidden", v !== name));
+  if (name === "docs") loadDocuments();
+  if (name === "review") loadReviews();
+}
+
+// ---------- conversaciones ----------
+async function loadConversations() {
+  const list = $("#conv-list");
+  let convs = [];
+  try { convs = await api("/conversations"); } catch { /* se muestra vacío */ }
+  list.replaceChildren();
+  if (!convs.length) { list.append(el("li", "empty-side", "Todavía no tenés conversaciones.")); return; }
+  for (const c of convs) {
+    const li = el("li");
+    const b = el("button");
+    b.dataset.id = c.conversation_id;
+    if (c.conversation_id === state.conversationId) b.setAttribute("aria-current", "true");
+    b.append(el("span", "conv-title", c.title), el("span", "conv-date", fmtDate(c.updated_at)));
+    b.addEventListener("click", () => openConversation(c.conversation_id));
+    li.append(b);
+    list.append(li);
+  }
+}
+function markCurrent() {
+  document.querySelectorAll("#conv-list button").forEach((b) => b.toggleAttribute("aria-current", b.dataset.id === state.conversationId));
+}
+function newConversationView() {
+  state.conversationId = null;
+  store.del(`kh.conv.${state.user}`);
+  markCurrent();
+  const inner = $("#msgs-inner");
+  inner.replaceChildren();
+  const w = el("div", "welcome");
+  w.append(el("h2", null, `Hola, ${state.user}`), el("div", null, "Preguntá lo que quieras sobre el material del curso. Si pegás código, lo revisa contra lo explicado en clase."));
+  const ex = el("div", "examples");
+  for (const q of EXAMPLES) { const b = el("button", null, q); b.type = "button"; b.addEventListener("click", () => { $("#question").value = q; $("#question").focus(); autosize(); }); ex.append(b); }
+  w.append(ex);
+  inner.append(w);
+  $("#question").focus();
+}
+$("#new-conv").addEventListener("click", () => { showView("chat"); newConversationView(); });
+
+async function openConversation(id) {
+  showView("chat");
+  const detail = await api(`/conversations/${encodeURIComponent(id)}`);
+  state.conversationId = id;
+  store.set(`kh.conv.${state.user}`, id);
+  markCurrent();
+  const inner = $("#msgs-inner");
+  inner.replaceChildren();
+  if (!detail.messages.length) { newConversationView(); state.conversationId = id; return; }
+  for (const m of detail.messages) {
+    if (m.role === "user") inner.append(userMessage(m.content));
+    else inner.append(botMessage({ answer: m.content }, null, true));
+  }
+  scrollDown();
+}
+
+// ---------- mensajes ----------
+function userMessage(text, code) {
+  const wrap = el("div", "msg user");
+  wrap.append(el("div", "bubble", text));
+  if (code) wrap.append(el("div", "code-note", `+ código adjunto (${code.split("\n").length} líneas)`));
+  return wrap;
+}
+function thinkingMessage() {
+  const wrap = el("div", "msg bot");
+  const b = el("div", "bubble thinking");
+  b.append(el("span", "spinner"), el("span", "thinking-text", "Buscando en el material…"));
+  wrap.append(b);
+  return wrap;
+}
+const STEP_TEXT = { PENDING: "En cola…", RUNNING: "Los agentes están trabajando: buscar, revisar, redactar y validar…" };
+const AGENT_NAMES = { retriever: "Buscador", code_reviewer: "Revisor", tutor: "Tutor", validator: "Validador" };
+
+function botMessage(result, job, fromHistory = false) {
+  const wrap = el("div", "msg bot");
+  const bubble = el("div", "bubble md");
+  bubble.innerHTML = renderMarkdown(result.answer || "");
+  wrap.append(bubble);
+
+  const citations = result.citations || [];
+  bubble.querySelectorAll("sup.cite").forEach((s) => {
+    const c = citations.find((x) => String(x.number) === s.dataset.n);
+    if (c) s.title = `${c.title} — ${c.source}`;
+  });
+
+  if (!fromHistory) {
+    const meta = el("div", "meta");
+    const v = result.validation;
+    if (v) meta.append(el("span", `badge ${v.verdict === "approved" ? "ok" : "warn"}`, v.verdict === "approved" ? "✓ Validado con el material" : "⚠ Validación parcial"));
+    for (const a of result.agents_used || []) meta.append(el("span", "chip", AGENT_NAMES[a] || a));
+    if (job && job.trace_id && state.phoenix) {
+      const link = el("a", null, "Ver traza en Phoenix ↗");
+      link.href = `${state.phoenix.replace(/\/$/, "")}/redirects/traces/${encodeURIComponent(job.trace_id)}`;
+      link.target = "_blank"; link.rel = "noopener";
+      meta.append(link);
+    }
+    wrap.append(meta);
+  }
+
+  if (citations.length) {
+    const d = el("details", "extra");
+    d.append(el("summary", null, `Fuentes (${citations.length})`));
+    for (const c of citations) {
+      const s = el("div", "source");
+      const head = el("div");
+      head.append(el("b", null, `[${c.number}] `), document.createTextNode(`${c.title} · módulo ${c.module}`));
+      const src = el("div", "conv-date", c.source);
+      s.append(head, src, el("div", "snippet", c.snippet));
+      d.append(s);
+    }
+    wrap.append(d);
+  }
+
+  const review = result.code_review;
+  if (review && review.issues && review.issues.length) {
+    const d = el("details", "extra");
+    d.open = true;
+    d.append(el("summary", null, `Revisión de código (${review.issues.length} observaciones)`));
+    for (const i of review.issues) {
+      const box = el("div", "issue");
+      const head = el("div");
+      head.append(el("span", `sev ${i.severity}`, i.severity), document.createTextNode(i.line ? ` línea ${i.line}` : ""));
+      box.append(head, el("div", null, i.problem));
+      const fix = el("div", "hint"); fix.textContent = `Corrección: ${i.fix}`;
+      box.append(fix);
+      d.append(box);
+    }
+    wrap.append(d);
+  }
+
+  const quiz = result.quiz || [];
+  if (quiz.length) {
+    const d = el("details", "extra");
+    d.append(el("summary", null, `Cuestionario (${quiz.length} preguntas)`));
+    quiz.forEach((q, n) => {
+      const box = el("div", "quiz-q");
+      box.append(el("div", null, `${n + 1}. ${q.question}`));
+      const ol = el("ol");
+      for (const o of q.options || []) ol.append(el("li", null, o));
+      box.append(ol);
+      const btn = el("button", "linkbtn", "Ver respuesta");
+      btn.type = "button";
+      btn.addEventListener("click", () => {
+        [...ol.children].forEach((li) => li.classList.toggle("correct", li.textContent === q.answer));
+        const open = !(q.options || []).length;
+        btn.replaceWith(el("div", "hint", `${open ? `Respuesta: ${q.answer}. ` : ""}${q.explanation || ""}`));
+      });
+      box.append(btn);
+      d.append(box);
+    });
+    wrap.append(d);
+  }
+  return wrap;
+}
+function scrollDown() { const m = $("#messages"); m.scrollTop = m.scrollHeight; }
+
+// ---------- enviar ----------
+const question = $("#question");
+function autosize() { question.style.height = "auto"; question.style.height = Math.min(question.scrollHeight, 200) + "px"; }
+question.addEventListener("input", autosize);
+question.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#composer").requestSubmit(); } });
+$("#toggle-code").addEventListener("click", (e) => {
+  const on = e.currentTarget.getAttribute("aria-pressed") !== "true";
+  e.currentTarget.setAttribute("aria-pressed", String(on));
+  $("#code-input").classList.toggle("hidden", !on);
+  if (on) $("#code-input").focus();
+});
+
+$("#composer").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = question.value.trim();
+  if (state.busy || text.length < 3) return;
+  const codeOn = $("#toggle-code").getAttribute("aria-pressed") === "true";
+  const code = codeOn ? $("#code-input").value.trim() : "";
+  state.busy = true; $("#send").disabled = true;
+
+  const inner = $("#msgs-inner");
+  inner.querySelector(".welcome")?.remove();
+  inner.append(userMessage(text, code));
+  const thinking = thinkingMessage();
+  inner.append(thinking);
+  scrollDown();
+  question.value = ""; autosize();
+
+  try {
+    if (!state.conversationId) {
+      const conv = await api("/conversations", { method: "POST", body: {} });
+      state.conversationId = conv.conversation_id;
+      store.set(`kh.conv.${state.user}`, conv.conversation_id);
+    }
+    const body = { question: text, level: $("#level").value };
+    if (code) body.code = code;
+    const created = await api(`/conversations/${encodeURIComponent(state.conversationId)}/messages`, { method: "POST", body });
+    const job = await waitJob(created.job_id, ["DONE", "FAILED"], (j) => {
+      thinking.querySelector(".thinking-text").textContent = STEP_TEXT[j.status] || "Procesando…";
+    });
+    if (job.status === "FAILED") throw new Error(job.error || "El procesamiento falló.");
+    thinking.replaceWith(botMessage(job.result, job));
+    if (codeOn) { $("#code-input").value = ""; $("#toggle-code").click(); }
+    loadConversations();
+  } catch (err) {
+    const box = el("div", "msg bot");
+    box.append(el("div", "error-box", err.status === 409 ? "Todavía estoy respondiendo la pregunta anterior de esta conversación." : err.message));
+    thinking.replaceWith(box);
+  } finally {
+    state.busy = false; $("#send").disabled = false; scrollDown(); question.focus();
+  }
+});
+
+// ---------- documentos ----------
+async function loadDocuments() {
+  const body = $("#docs-body");
+  try {
+    const docs = await api("/documents");
+    $("#docs-count").textContent = `${docs.length} documentos indexados, disponibles para todo el equipo.`;
+    body.replaceChildren();
+    docs.sort((a, b) => a.module - b.module || a.source.localeCompare(b.source));
+    for (const d of docs) {
+      const tr = el("tr");
+      const name = el("td");
+      name.append(el("div", null, d.title), el("div", "conv-date", d.source));
+      tr.append(name, el("td", null, String(d.module)), el("td", null, d.doc_type), el("td", null, String(d.chunks)), el("td", null, d.approved_by || "—"));
+      body.append(tr);
+    }
+  } catch (err) { $("#docs-count").textContent = err.message; }
+}
+$("#upload-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const file = $("#upload-file").files[0];
+  if (!file) return;
+  const status = $("#upload-status");
+  const btn = $("#upload-btn");
+  btn.disabled = true;
+  status.innerHTML = '<span class="thinking"><span class="spinner"></span> Subiendo y analizando el documento…</span>';
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    if ($("#upload-module").value) form.append("module", $("#upload-module").value);
+    const created = await api("/documents", { method: "POST", form });
+    const job = await waitJob(created.job_id, ["WAITING_APPROVAL", "DONE", "FAILED"]);
+    if (job.status === "FAILED") throw new Error(job.error || "El análisis falló.");
+    const a = (job.approval_request && job.approval_request.analysis) || {};
+    status.replaceChildren();
+    const ok = el("div", "badge ok", "✓ Enviado a revisión");
+    const info = el("div", "hint");
+    info.textContent = `El agente lo clasificó en el módulo ${a.module ?? "?"} (${a.topic ?? "sin tema"}). Un admin tiene que aprobarlo para que entre a la base.`;
+    status.append(ok, info);
+    $("#upload-form").reset();
+    checkAdmin();
+  } catch (err) {
+    status.replaceChildren(el("div", "error-box", err.message));
+  } finally { btn.disabled = false; }
+});
+
+// ---------- revisión ----------
+async function loadReviews() {
+  const list = $("#review-list");
+  list.replaceChildren(el("div", "hint", "Cargando…"));
+  let pending;
+  try { pending = await api("/documents/reviews"); }
+  catch (err) { list.replaceChildren(el("div", "error-box", err.message)); return; }
+  list.replaceChildren();
+  if (!pending.length) { list.append(el("div", "hint", "No hay documentos pendientes.")); return; }
+  for (const job of pending) list.append(reviewCard(job));
+}
+function reviewCard(job) {
+  const req = job.approval_request || {};
+  const a = req.analysis || {};
+  const card = el("div", "review");
+  card.append(el("h3", null, req.filename || job.payload.filename), el("div", "conv-date", `Subido por ${req.uploaded_by || job.user_id} · ${fmtDate(job.created_at)}`));
+  const dl = el("dl", "kv");
+  const add = (k, v) => { dl.append(el("dt", null, k), el("dd", null, v)); };
+  add("Resumen", a.summary || "—");
+  add("Módulo", String(a.module ?? "—"));
+  add("Tema", a.topic || "—");
+  add("Dificultad", a.difficulty || "—");
+  add("Calidad", (a.quality_issues || []).length ? a.quality_issues.join("; ") : "Sin observaciones");
+  add("Duplicados", (req.duplicates || []).length ? req.duplicates.map((d) => d.source || d.doc_id).join(", ") : "No se encontraron");
+  card.append(dl);
+
+  const actions = el("div", "review-actions");
+  const mod = el("input"); mod.type = "number"; mod.min = 0; mod.max = 20; mod.value = a.module ?? ""; mod.setAttribute("aria-label", "Módulo");
+  const topic = el("input"); topic.type = "text"; topic.value = a.topic || ""; topic.maxLength = 120; topic.setAttribute("aria-label", "Tema");
+  const approve = el("button", "btn btn-ok", "Aprobar");
+  const reject = el("button", "btn btn-bad", "Rechazar");
+  const wrapMod = el("div"); wrapMod.append(el("label", null, "Módulo"), mod);
+  const wrapTopic = el("div"); wrapTopic.append(el("label", null, "Tema"), topic);
+  actions.append(wrapMod, wrapTopic, approve, reject);
+  card.append(actions);
+  const result = el("div", "status-box");
+  card.append(result);
+
+  const decide = async (approved) => {
+    approve.disabled = reject.disabled = true;
+    result.innerHTML = '<span class="thinking"><span class="spinner"></span> Aplicando la decisión…</span>';
+    try {
+      const body = { approved };
+      if (approved && mod.value !== "") body.module = Number(mod.value);
+      if (approved && topic.value.trim()) body.topic = topic.value.trim();
+      const rec = await api(`/documents/reviews/${encodeURIComponent(job.job_id)}`, { method: "POST", body });
+      const done = await waitJob(rec.job_id);
+      if (done.status === "FAILED") throw new Error(done.error || "Falló al indexar.");
+      const r = done.result || {};
+      result.replaceChildren(el("div", `badge ${approved ? "ok" : "warn"}`, approved ? `✓ Indexado: ${r.chunks} fragmentos en el módulo ${r.module}` : "Rechazado y descartado"));
+      refreshHealth();
+    } catch (err) {
+      result.replaceChildren(el("div", "error-box", err.message));
+      approve.disabled = reject.disabled = false;
+    }
+  };
+  approve.addEventListener("click", () => decide(true));
+  reject.addEventListener("click", () => decide(false));
+  return card;
+}
+
+// ---------- arranque ----------
+const saved = store.get("kh.user");
+if (saved && /^[A-Za-z0-9_.@-]{2,60}$/.test(saved)) enter(saved); else showLogin();
+</script>
+</body>
+</html>

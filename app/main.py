@@ -6,11 +6,11 @@ import re
 import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from pathlib import PurePath
+from pathlib import Path, PurePath
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
@@ -49,6 +49,7 @@ from app.schemas import (
 RedisFactory = Callable[[str], Redis]
 CheckpointerFactory = Callable[[Settings], AbstractAsyncContextManager[BaseCheckpointSaver[Any]]]
 
+WEB_UI = Path(__file__).parent / "web" / "index.html"
 _UNSAFE_FILENAME = re.compile(r"[^A-Za-z0-9._-]+")
 
 
@@ -171,7 +172,15 @@ def create_app(
             vector_store=resolved.vector_store,
             embedding_provider=resolved.embedding_provider,
             documents=documents,
+            phoenix_ui_url=resolved.phoenix_ui_url if resolved.observability_enabled else None,
         )
+
+    # ---------------- interfaz web ----------------
+    @app.get("/", include_in_schema=False)
+    async def web_ui() -> FileResponse:
+        """Chat para usuarios finales: un cliente más de esta misma API (sin lógica propia)."""
+
+        return FileResponse(WEB_UI, media_type="text/html")
 
     # ---------------- conversaciones ----------------
     @app.post(

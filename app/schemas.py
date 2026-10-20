@@ -53,6 +53,8 @@ class JobRecord(BaseModel):
     error: str | None = None
     approval_request: dict[str, Any] | None = None
     approval_decision: dict[str, Any] | None = None
+    # Trace de OpenTelemetry del último procesamiento: Phoenix lo abre en /redirects/traces/{id}.
+    trace_id: str | None = None
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
 
@@ -106,3 +108,4 @@ class HealthResponse(BaseModel):
     vector_store: str
     embedding_provider: str
     documents: int
+    phoenix_ui_url: str | None = None

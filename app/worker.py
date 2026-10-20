@@ -107,6 +107,10 @@ class Worker:
                     "agent_mode": self.settings.agent_mode,
                 },
             )
+            context = span.get_span_context()
+            if context.is_valid:
+                # Antes de cualquier estado final: quien ve DONE ya tiene el link a la traza.
+                await self.jobs.update(job_id, trace_id=format(context.trace_id, "032x"))
             try:
                 if record.kind is JobKind.CHAT:
                     outcome, output = await self._run_chat(record)

@@ -62,6 +62,8 @@ class Settings(BaseSettings):
     observability_enabled: bool = True
     phoenix_collector_endpoint: str = "http://localhost:6006/v1/traces"
     phoenix_project_name: str = "ai-engineering-knowledge-hub"
+    # Dirección de Phoenix vista desde el navegador (la interfaz web arma links a las trazas).
+    phoenix_ui_url: str = "http://localhost:6006"
 
     @model_validator(mode="after")
     def _check_overlap(self) -> "Settings":

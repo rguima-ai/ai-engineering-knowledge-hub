@@ -116,6 +116,15 @@ def test_health(harness: Harness) -> None:
     assert body["documents"] == 3
 
 
+def test_interfaz_web_se_sirve_en_la_raiz(harness: Harness) -> None:
+    response = harness.client.get("/")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert "<title>Knowledge Hub</title>" in response.text
+    # Es un cliente de la API, no una ruta documentada de la API.
+    assert "/" not in harness.client.get("/openapi.json").json()["paths"]
+
+
 async def test_pregunta_completa_y_historial(harness: Harness, conversation: str) -> None:
     created = harness.ask(conversation, question="¿Qué hace AsyncRedisSaver?", level="avanzado")
     assert created.status_code == 202
@@ -263,7 +272,7 @@ def _job_spans(exporter: InMemorySpanExporter) -> list[ReadableSpan]:
 async def test_span_de_chat_con_pregunta_y_respuesta(
     harness: Harness, conversation: str, spans: InMemorySpanExporter
 ) -> None:
-    harness.ask(conversation, question="¿Qué hace AsyncRedisSaver?")
+    created = harness.ask(conversation, question="¿Qué hace AsyncRedisSaver?")
     await harness.drain()
 
     (span,) = _job_spans(spans)
@@ -272,6 +281,9 @@ async def test_span_de_chat_con_pregunta_y_respuesta(
     assert attrs["input.value"] == "¿Qué hace AsyncRedisSaver?"
     assert attrs["output.value"]
     assert span.status.status_code is StatusCode.OK
+    # El job guarda su trace_id para que la interfaz arme el link a Phoenix.
+    job = harness.client.get(f"/jobs/{created.json()['job_id']}", headers=USER).json()
+    assert job["trace_id"] == format(span.context.trace_id, "032x")
 
 
 async def test_span_de_ingesta_antes_y_despues_de_aprobar(
